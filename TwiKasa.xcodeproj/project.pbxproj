@@ -6,6 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		924108E42E62B3C00094E1D6 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 924108E32E62B3C00094E1D6 /* FirebaseAuth */; };
+		924108E62E62B3C00094E1D6 /* FirebaseAuthCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 924108E52E62B3C00094E1D6 /* FirebaseAuthCombine-Community */; };
+		924108E82E62B3C00094E1D6 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 924108E72E62B3C00094E1D6 /* FirebaseFirestore */; };
+		924108EA2E62B3C00094E1D6 /* FirebaseFirestoreCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 924108E92E62B3C00094E1D6 /* FirebaseFirestoreCombine-Community */; };
+		924108F02E63E2DA0094E1D6 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 924108EF2E63E2C40094E1D6 /* .gitignore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		924108C42E62B1B90094E1D6 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +35,7 @@
 		924108B62E62B1B80094E1D6 /* TwiKasa.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TwiKasa.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		924108C32E62B1B90094E1D6 /* TwiKasaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TwiKasaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		924108CD2E62B1B90094E1D6 /* TwiKasaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TwiKasaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		924108EF2E63E2C40094E1D6 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -52,6 +61,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				924108E42E62B3C00094E1D6 /* FirebaseAuth in Frameworks */,
+				924108EA2E62B3C00094E1D6 /* FirebaseFirestoreCombine-Community in Frameworks */,
+				924108E62E62B3C00094E1D6 /* FirebaseAuthCombine-Community in Frameworks */,
+				924108E82E62B3C00094E1D6 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +88,7 @@
 		924108AD2E62B1B80094E1D6 = {
 			isa = PBXGroup;
 			children = (
+				924108EF2E63E2C40094E1D6 /* .gitignore */,
 				924108B82E62B1B80094E1D6 /* TwiKasa */,
 				924108C62E62B1B90094E1D6 /* TwiKasaTests */,
 				924108D02E62B1B90094E1D6 /* TwiKasaUITests */,
@@ -112,6 +126,10 @@
 			);
 			name = TwiKasa;
 			packageProductDependencies = (
+				924108E32E62B3C00094E1D6 /* FirebaseAuth */,
+				924108E52E62B3C00094E1D6 /* FirebaseAuthCombine-Community */,
+				924108E72E62B3C00094E1D6 /* FirebaseFirestore */,
+				924108E92E62B3C00094E1D6 /* FirebaseFirestoreCombine-Community */,
 			);
 			productName = TwiKasa;
 			productReference = 924108B62E62B1B80094E1D6 /* TwiKasa.app */;
@@ -195,6 +213,9 @@
 			);
 			mainGroup = 924108AD2E62B1B80094E1D6;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				924108E22E62B3C00094E1D6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 924108B72E62B1B80094E1D6 /* Products */;
 			projectDirPath = "";
@@ -212,6 +233,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				924108F02E63E2DA0094E1D6 /* .gitignore in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -400,6 +422,7 @@
 				DEVELOPMENT_TEAM = QB2T369883;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Twi Kasa";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -428,6 +451,7 @@
 				DEVELOPMENT_TEAM = QB2T369883;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Twi Kasa";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -558,6 +582,40 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		924108E22E62B3C00094E1D6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		924108E32E62B3C00094E1D6 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 924108E22E62B3C00094E1D6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		924108E52E62B3C00094E1D6 /* FirebaseAuthCombine-Community */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 924108E22E62B3C00094E1D6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = "FirebaseAuthCombine-Community";
+		};
+		924108E72E62B3C00094E1D6 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 924108E22E62B3C00094E1D6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		924108E92E62B3C00094E1D6 /* FirebaseFirestoreCombine-Community */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 924108E22E62B3C00094E1D6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = "FirebaseFirestoreCombine-Community";
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 924108AE2E62B1B80094E1D6 /* Project object */;
 }
