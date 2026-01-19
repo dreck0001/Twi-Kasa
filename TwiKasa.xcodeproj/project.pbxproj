@@ -38,20 +38,51 @@
 		924108EF2E63E2C40094E1D6 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		92EC4D2D2F19E17100EA3C42 /* Exceptions for "TwiKasa" folder in "TwiKasa" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 924108B52E62B1B80094E1D6 /* TwiKasa */;
+		};
+		92EC4D3A2F19E67900EA3C42 /* Exceptions for "TwiKasaTests" folder in "TwiKasa" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				TwiKasaTests.swift,
+			);
+			target = 924108B52E62B1B80094E1D6 /* TwiKasa */;
+		};
+		92EC4D3B2F19E67900EA3C42 /* Exceptions for "TwiKasaTests" folder in "TwiKasaTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				TwiKasaTests.swift,
+			);
+			target = 924108C22E62B1B90094E1D6 /* TwiKasaTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		924108B82E62B1B80094E1D6 /* TwiKasa */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = TwiKasa;
-			sourceTree = "<group>";
-		};
-		924108C62E62B1B90094E1D6 /* TwiKasaTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = TwiKasaTests;
-			sourceTree = "<group>";
-		};
 		924108D02E62B1B90094E1D6 /* TwiKasaUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = TwiKasaUITests;
+			sourceTree = "<group>";
+		};
+		92EC4D1A2F19E17100EA3C42 /* TwiKasa */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				92EC4D2D2F19E17100EA3C42 /* Exceptions for "TwiKasa" folder in "TwiKasa" target */,
+			);
+			path = TwiKasa;
+			sourceTree = "<group>";
+		};
+		92EC4D382F19E67900EA3C42 /* TwiKasaTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				92EC4D3A2F19E67900EA3C42 /* Exceptions for "TwiKasaTests" folder in "TwiKasa" target */,
+				92EC4D3B2F19E67900EA3C42 /* Exceptions for "TwiKasaTests" folder in "TwiKasaTests" target */,
+			);
+			path = TwiKasaTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -89,8 +120,8 @@
 			isa = PBXGroup;
 			children = (
 				924108EF2E63E2C40094E1D6 /* .gitignore */,
-				924108B82E62B1B80094E1D6 /* TwiKasa */,
-				924108C62E62B1B90094E1D6 /* TwiKasaTests */,
+				92EC4D1A2F19E17100EA3C42 /* TwiKasa */,
+				92EC4D382F19E67900EA3C42 /* TwiKasaTests */,
 				924108D02E62B1B90094E1D6 /* TwiKasaUITests */,
 				924108B72E62B1B80094E1D6 /* Products */,
 			);
@@ -122,7 +153,8 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				924108B82E62B1B80094E1D6 /* TwiKasa */,
+				92EC4D1A2F19E17100EA3C42 /* TwiKasa */,
+				92EC4D382F19E67900EA3C42 /* TwiKasaTests */,
 			);
 			name = TwiKasa;
 			packageProductDependencies = (
@@ -147,9 +179,6 @@
 			);
 			dependencies = (
 				924108C52E62B1B90094E1D6 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				924108C62E62B1B90094E1D6 /* TwiKasaTests */,
 			);
 			name = TwiKasaTests;
 			packageProductDependencies = (
@@ -189,7 +218,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1640;
-				LastUpgradeCheck = 1640;
+				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					924108B52E62B1B80094E1D6 = {
 						CreatedOnToolsVersion = 16.4;
@@ -350,6 +379,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -407,6 +437,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -422,12 +453,15 @@
 				DEVELOPMENT_TEAM = QB2T369883;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TwiKasa/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Twi Kasa";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "To play audio pronunciations of Twi words";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -451,12 +485,15 @@
 				DEVELOPMENT_TEAM = QB2T369883;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TwiKasa/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Twi Kasa";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "To play audio pronunciations of Twi words";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
