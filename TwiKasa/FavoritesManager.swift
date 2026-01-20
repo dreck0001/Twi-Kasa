@@ -30,6 +30,7 @@ class FavoritesManager: ObservableObject {
             favoriteIds.remove(entryId)
         } else {
             favoriteIds.insert(entryId)
+            TrendingService.shared.trackFavorite(entryId)
         }
         saveFavorites()
     }

@@ -1,10 +1,3 @@
-//
-//  SearchView.swift
-//  TwiKasa
-//
-//  Created by Throw Catchers on 1/12/26.
-//
-
 import SwiftUI
 
 struct SearchView: View {
@@ -37,10 +30,9 @@ struct SearchView: View {
             .navigationTitle("Dictionary")
             .navigationBarTitleDisplayMode(.large)
             .task {
-                // Refresh trending words if empty OR if stale (older than 1 hour)
                 let shouldRefresh = trendingWords.isEmpty || {
                     guard let lastRefresh = lastTrendingRefresh else { return true }
-                    return Date().timeIntervalSince(lastRefresh) > 3600  // 1 hour
+                    return Date().timeIntervalSince(lastRefresh) > 120 //should refresh every 2 mins
                 }()
                 
                 if shouldRefresh {
@@ -99,6 +91,11 @@ struct SearchView: View {
                         HorizontalWordCard(entry: entry)
                     }
                     .buttonStyle(.plain)
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            TrendingService.shared.trackSearch(entry.id)
+                        }
+                    )
                 }
             }
             .padding()
@@ -231,10 +228,10 @@ struct SearchView: View {
         isLoadingTrending = true
         Task {
             do {
-                let words = try await firestoreService.getCommonWords(limit: 10)
+                let words = try await TrendingService.shared.getTrendingWords(limit: 10)
                 await MainActor.run {
                     trendingWords = words
-                    lastTrendingRefresh = Date()  // Track when we last refreshed
+                    lastTrendingRefresh = Date()
                     isLoadingTrending = false
                 }
             } catch {

@@ -134,6 +134,9 @@ struct EntryDetailView: View {
             .offset(x: dragOffset)
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            TrendingService.shared.trackView(entry.id)
+        }
         .onDisappear {
             audioPlayer.stop()
         }
