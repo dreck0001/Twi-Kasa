@@ -1,7 +1,7 @@
 import Foundation
 
-// all images served from Firebase Storage
 private let imageBaseURL = "https://storage.googleapis.com/twi-kasa-prod.firebasestorage.app/images/"
+private let audioBaseURL = "https://storage.googleapis.com/twi-kasa-prod.firebasestorage.app/audio/"
 
 struct Definition: Codable, Identifiable, Hashable {
     let id = UUID()
@@ -15,8 +15,7 @@ struct Definition: Codable, Identifiable, Hashable {
     let morphology: String
     let frequency: Int
     let tags: [String]
-    let imageUrl: String
-    let audioUrl: String
+    let contentWarning: Bool
     
     enum CodingKeys: String, CodingKey {
         case definitionNumber
@@ -29,8 +28,7 @@ struct Definition: Codable, Identifiable, Hashable {
         case morphology
         case frequency
         case tags
-        case imageUrl
-        case audioUrl
+        case contentWarning
     }
     
     init(
@@ -44,8 +42,7 @@ struct Definition: Codable, Identifiable, Hashable {
         morphology: String,
         frequency: Int,
         tags: [String],
-        imageUrl: String = "",
-        audioUrl: String = ""
+        contentWarning: Bool = false
     ) {
         self.definitionNumber = definitionNumber
         self.partOfSpeech = partOfSpeech
@@ -57,8 +54,7 @@ struct Definition: Codable, Identifiable, Hashable {
         self.morphology = morphology
         self.frequency = frequency
         self.tags = tags
-        self.imageUrl = imageUrl
-        self.audioUrl = audioUrl
+        self.contentWarning = contentWarning
     }
     
     init(from decoder: Decoder) throws {
@@ -73,21 +69,23 @@ struct Definition: Codable, Identifiable, Hashable {
         morphology = try container.decode(String.self, forKey: .morphology)
         frequency = try container.decode(Int.self, forKey: .frequency)
         tags = try container.decode([String].self, forKey: .tags)
-        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl) ?? ""
-        audioUrl = try container.decodeIfPresent(String.self, forKey: .audioUrl) ?? ""
+        contentWarning = try container.decodeIfPresent(Bool.self, forKey: .contentWarning) ?? false
     }
     
-    var hasImage: Bool {
-        !imageUrl.isEmpty
+    func imageUrl(for parentNormalized: String) -> String {
+        "\(parentNormalized)-\(definitionNumber).jpg"
     }
     
-    var hasAudio: Bool {
-        !audioUrl.isEmpty
+    func audioUrl(for parentNormalized: String) -> String {
+        "\(parentNormalized)-\(definitionNumber).mp3"
     }
     
-    var fullImageUrl: String {
-        guard !imageUrl.isEmpty else { return "" }
-        return imageBaseURL + imageUrl
+    func fullImageUrl(for parentNormalized: String) -> String {
+        imageBaseURL + imageUrl(for: parentNormalized)
+    }
+    
+    func fullAudioUrl(for parentNormalized: String) -> String {
+        audioBaseURL + audioUrl(for: parentNormalized)
     }
     
     static func == (lhs: Definition, rhs: Definition) -> Bool {
@@ -129,7 +127,6 @@ struct Entry: Codable, Identifiable, Hashable {
     let dialects: [String]
     let syllables: String
     let ipa: String
-    let imageUrl: String
     let definitions: [Definition]
     let attribution: String
     let createdAt: String
@@ -137,15 +134,6 @@ struct Entry: Codable, Identifiable, Hashable {
     
     var primaryFrequency: Int {
         definitions.max(by: { $0.frequency < $1.frequency })?.frequency ?? 50
-    }
-    
-    var hasImage: Bool {
-        !imageUrl.isEmpty
-    }
-    
-    var fullImageUrl: String {
-        guard !imageUrl.isEmpty else { return "" }
-        return imageBaseURL + imageUrl
     }
     
     static func == (lhs: Entry, rhs: Entry) -> Bool {

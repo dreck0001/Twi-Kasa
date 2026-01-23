@@ -8,6 +8,8 @@ struct EntryDetailView: View {
     @State private var selectedDefinitionIndex = 0
     @State private var scrollOffset: CGFloat = 0
     @State private var dragOffset: CGFloat = 0
+    @State private var explicitContentRevealed = false
+    @State private var isSwipingBack = false
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var favoritesManager = FavoritesManager.shared
     
@@ -18,6 +20,10 @@ struct EntryDetailView: View {
                     headerSection
                     
                     VStack(alignment: .leading, spacing: 40) {
+                        if selectedDefinition.contentWarning {
+                            contentWarningBanner
+                        }
+                        
                         partOfSpeechTabs
                         
                         definitionsSection
@@ -53,20 +59,31 @@ struct EntryDetailView: View {
                 })
             }
             .coordinateSpace(name: "scroll")
+            .scrollDisabled(isSwipingBack)
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                 scrollOffset = value
             }
             .ignoresSafeArea()
             .offset(x: dragOffset)
             .gesture(
-                DragGesture()
+                DragGesture(minimumDistance: 20)
                     .onChanged { gesture in
-                        if gesture.translation.width > 0 && scrollOffset >= 0 {
-                            dragOffset = gesture.translation.width
+                        let horizontalAmount = gesture.translation.width
+                        let verticalAmount = abs(gesture.translation.height)
+                        
+                        // Only allow horizontal swipe if it's primarily horizontal
+                        if horizontalAmount > verticalAmount && horizontalAmount > 0 && scrollOffset >= 0 {
+                            isSwipingBack = true
+                            dragOffset = horizontalAmount
                         }
                     }
                     .onEnded { gesture in
-                        if gesture.translation.width > 100 {
+                        isSwipingBack = false
+                        let horizontalAmount = gesture.translation.width
+                        let verticalAmount = abs(gesture.translation.height)
+                        
+                        // Only dismiss if gesture was primarily horizontal
+                        if horizontalAmount > verticalAmount && horizontalAmount > 100 {
                             dismiss()
                         } else {
                             withAnimation(.spring()) {
@@ -140,6 +157,31 @@ struct EntryDetailView: View {
         .onDisappear {
             audioPlayer.stop()
         }
+        .onChange(of: selectedDefinitionIndex) { oldValue, newValue in
+            explicitContentRevealed = false
+        }
+    }
+    
+    private var contentWarningBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Explicit Content")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                
+                Text("This definition contains explicit or sensitive language")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+        .padding()
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(12)
     }
     
     private var headerSection: some View {
@@ -157,17 +199,17 @@ struct EntryDetailView: View {
     }
     
     private var currentImageUrl: String {
-        if selectedDefinition.hasImage {
-            return selectedDefinition.fullImageUrl
-        }
-        if !entry.imageUrl.isEmpty {
-            return entry.fullImageUrl
-        }
-        return ""
+        let url = selectedDefinition.fullImageUrl(for: entry.normalized)
+        print("DEBUG: Attempting to load image: \(url)")
+        return url
+    }
+    
+    private var shouldBlurImage: Bool {
+        selectedDefinition.contentWarning && !explicitContentRevealed
     }
     
     private var navigationOpacity: Double {
-        let threshold: CGFloat = entry.hasImage ? 150 : 100
+        let threshold: CGFloat = !currentImageUrl.isEmpty ? 150 : 100
         let progress = min(max(-scrollOffset / threshold, 0), 1)
         return progress
     }
@@ -177,10 +219,8 @@ struct EntryDetailView: View {
     }
     
     private var audioFileExists: Bool {
-        guard selectedDefinition.hasAudio else { return false }
-        let filename = selectedDefinition.audioUrl.replacingOccurrences(of: ".mp3", with: "")
-        let exists = Bundle.main.url(forResource: filename, withExtension: "mp3") != nil
-        return exists
+        let filename = selectedDefinition.audioUrl(for: entry.normalized).replacingOccurrences(of: ".mp3", with: "")
+        return Bundle.main.url(forResource: filename, withExtension: "mp3") != nil
     }
     
     private var headerGradient: LinearGradient {
@@ -224,6 +264,29 @@ struct EntryDetailView: View {
                         .aspectRatio(contentMode: .fill)
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .clipped()
+                        .blur(radius: shouldBlurImage ? 30 : 0)
+                        .overlay(
+                            Group {
+                                if shouldBlurImage {
+                                    Button {
+                                        withAnimation {
+                                            explicitContentRevealed = true
+                                        }
+                                    } label: {
+                                        VStack(spacing: 8) {
+                                            Image(systemName: "eye.slash.fill")
+                                                .font(.largeTitle)
+                                            Text("Tap to reveal")
+                                                .font(.subheadline)
+                                        }
+                                        .foregroundColor(.white)
+                                        .padding(20)
+                                        .background(Color.black.opacity(0.7))
+                                        .cornerRadius(12)
+                                    }
+                                }
+                            }
+                        )
                         .overlay(
                             VStack(spacing: 0) {
                                 LinearGradient(
@@ -266,7 +329,7 @@ struct EntryDetailView: View {
                                                     .foregroundColor(.white)
                                                     .contentShape(Rectangle())
                                                     .onTapGesture {
-                                                        audioPlayer.play(filename: selectedDefinition.audioUrl)
+                                                        audioPlayer.play(filename: selectedDefinition.audioUrl(for: entry.normalized))
                                                     }
                                             }
                                         }
@@ -326,7 +389,7 @@ struct EntryDetailView: View {
                                 .foregroundColor(.white)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
-                                    audioPlayer.play(filename: selectedDefinition.audioUrl)
+                                    audioPlayer.play(filename: selectedDefinition.audioUrl(for: entry.normalized))
                                 }
                         }
                     }
@@ -350,19 +413,27 @@ struct EntryDetailView: View {
                             selectedDefinitionIndex = index
                         }
                     } label: {
-                        Text(definition.partOfSpeech)
-                            .font(.subheadline)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                selectedDefinitionIndex == index ?
-                                Color.blue : Color.gray.opacity(0.2)
-                            )
-                            .foregroundColor(
-                                selectedDefinitionIndex == index ?
-                                .white : .primary
-                            )
-                            .cornerRadius(8)
+                        HStack(spacing: 4) {
+                            if definition.contentWarning {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(selectedDefinitionIndex == index ? .white : .orange)
+                            }
+                            
+                            Text(definition.partOfSpeech)
+                                .font(.subheadline)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            selectedDefinitionIndex == index ?
+                            Color.blue : Color.gray.opacity(0.2)
+                        )
+                        .foregroundColor(
+                            selectedDefinitionIndex == index ?
+                            .white : .primary
+                        )
+                        .cornerRadius(8)
                     }
                 }
             }
@@ -631,64 +702,31 @@ struct FlowLayout: Layout {
 #Preview {
     NavigationStack {
         EntryDetailView(entry: Entry(
-            id: "bank",
-            headword: "bank",
-            normalized: "bank",
+            id: "aboa",
+            headword: "aboa",
+            normalized: "aboa",
             dialects: ["Asante", "Akuapem"],
-            syllables: "bank",
-            ipa: "bæŋk",
-            imageUrl: "",
+            syllables: "a-bo-a",
+            ipa: "abòá",
             definitions: [
                 Definition(
                     definitionNumber: 1,
                     partOfSpeech: "noun",
-                    enDefinition: "A financial institution where people deposit money and obtain loans.",
-                    twiDefinition: "Dwumadie a wɔde sika sie na wɔgye bosea.",
+                    enDefinition: "Animal; wild beast",
+                    twiDefinition: "Aboa a ɔte wuram",
                     examples: [
-                        Example(twi: "Mekɔɔ bank no mu kɔsie sika.", en: "I went to the bank to deposit money.")
+                        Example(twi: "Aboa no rewe wura no", en: "The animal is eating grass"),
+                        Example(twi: "Yɛhunuu aboa kɛseɛ bi wɔ kwaeɛ mu", en: "We saw a large animal in the forest")
                     ],
-                    synonyms: ["financial institution"],
-                    antonyms: [],
-                    morphology: "",
+                    synonyms: ["creature", "beast"],
+                    antonyms: ["human"],
+                    morphology: "Root: aboa",
                     frequency: 85,
-                    tags: ["business", "finance"],
-                    imageUrl: "bank-1.jpg",
-                    audioUrl: "bank-1.mp3"
-                ),
-                Definition(
-                    definitionNumber: 2,
-                    partOfSpeech: "noun",
-                    enDefinition: "The land alongside or sloping down to a river or lake.",
-                    twiDefinition: "Asase a ɛda asubɔnten anaa ɔtare ho.",
-                    examples: [
-                        Example(twi: "Yɛtenaa asubɔnten no ho.", en: "We sat by the river bank.")
-                    ],
-                    synonyms: ["shore", "edge"],
-                    antonyms: [],
-                    morphology: "",
-                    frequency: 70,
-                    tags: ["nature", "geography"],
-                    imageUrl: "bank-2.jpg",
-                    audioUrl: "bank-2.mp3"
-                ),
-                Definition(
-                    definitionNumber: 3,
-                    partOfSpeech: "verb",
-                    enDefinition: "To deposit money in a bank account.",
-                    twiDefinition: "Sika a wɔde kɔ bank mu.",
-                    examples: [
-                        Example(twi: "Me bank me sika wɔ bank no mu.", en: "I bank my money at that bank.")
-                    ],
-                    synonyms: ["deposit", "save"],
-                    antonyms: ["withdraw"],
-                    morphology: "",
-                    frequency: 65,
-                    tags: ["finance", "action"],
-                    imageUrl: "bank-3.jpg",
-                    audioUrl: "bank-3.mp3"
+                    tags: ["nature", "wildlife"],
+                    contentWarning: false
                 )
             ],
-            attribution: "seed_data",
+            attribution: "manual_import",
             createdAt: "",
             updatedAt: ""
         ))

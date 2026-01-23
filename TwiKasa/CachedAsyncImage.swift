@@ -28,8 +28,10 @@ struct CachedAsyncImage<Content: View>: View {
         }
         
         let urlString = url.absoluteString
+        print("CachedAsyncImage: Loading \(urlString)")
         
         if let cachedImage = ImageCache.shared.get(url: urlString) {
+            print("CachedAsyncImage: Found in cache")
             phase = .success(Image(uiImage: cachedImage))
             return
         }
@@ -42,6 +44,7 @@ struct CachedAsyncImage<Content: View>: View {
                 let (data, response) = try await URLSession.shared.data(from: url)
                 
                 if let httpResponse = response as? HTTPURLResponse {
+                    print("CachedAsyncImage: HTTP status \(httpResponse.statusCode)")
                     guard httpResponse.statusCode == 200 else {
                         let error = URLError(.badServerResponse)
                         await MainActor.run {
@@ -53,6 +56,7 @@ struct CachedAsyncImage<Content: View>: View {
                 }
                 
                 if let downloadedImage = UIImage(data: data) {
+                    print("CachedAsyncImage: Successfully loaded image")
                     ImageCache.shared.set(url: urlString, image: downloadedImage)
                     
                     await MainActor.run {
@@ -60,6 +64,7 @@ struct CachedAsyncImage<Content: View>: View {
                         isLoading = false
                     }
                 } else {
+                    print("CachedAsyncImage: Failed to decode image data")
                     let error = URLError(.cannotDecodeContentData)
                     await MainActor.run {
                         phase = .failure(error)
@@ -67,6 +72,7 @@ struct CachedAsyncImage<Content: View>: View {
                     }
                 }
             } catch {
+                print("CachedAsyncImage: Error - \(error)")
                 await MainActor.run {
                     phase = .failure(error)
                     isLoading = false

@@ -39,26 +39,26 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		92E93F8E2F20B0B800444852 /* Exceptions for "TwiKasaTests" folder in "TwiKasa" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				TwiKasaTests.swift,
+			);
+			target = 924108B52E62B1B80094E1D6 /* TwiKasa */;
+		};
+		92E93F8F2F20B0B800444852 /* Exceptions for "TwiKasaTests" folder in "TwiKasaTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				TwiKasaTests.swift,
+			);
+			target = 924108C22E62B1B90094E1D6 /* TwiKasaTests */;
+		};
 		92EC4D2D2F19E17100EA3C42 /* Exceptions for "TwiKasa" folder in "TwiKasa" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
 			target = 924108B52E62B1B80094E1D6 /* TwiKasa */;
-		};
-		92EC4D3A2F19E67900EA3C42 /* Exceptions for "TwiKasaTests" folder in "TwiKasa" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				TwiKasaTests.swift,
-			);
-			target = 924108B52E62B1B80094E1D6 /* TwiKasa */;
-		};
-		92EC4D3B2F19E67900EA3C42 /* Exceptions for "TwiKasaTests" folder in "TwiKasaTests" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				TwiKasaTests.swift,
-			);
-			target = 924108C22E62B1B90094E1D6 /* TwiKasaTests */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -68,21 +68,21 @@
 			path = TwiKasaUITests;
 			sourceTree = "<group>";
 		};
+		92E93F8C2F20B0B800444852 /* TwiKasaTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				92E93F8E2F20B0B800444852 /* Exceptions for "TwiKasaTests" folder in "TwiKasa" target */,
+				92E93F8F2F20B0B800444852 /* Exceptions for "TwiKasaTests" folder in "TwiKasaTests" target */,
+			);
+			path = TwiKasaTests;
+			sourceTree = "<group>";
+		};
 		92EC4D1A2F19E17100EA3C42 /* TwiKasa */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				92EC4D2D2F19E17100EA3C42 /* Exceptions for "TwiKasa" folder in "TwiKasa" target */,
 			);
 			path = TwiKasa;
-			sourceTree = "<group>";
-		};
-		92EC4D382F19E67900EA3C42 /* TwiKasaTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				92EC4D3A2F19E67900EA3C42 /* Exceptions for "TwiKasaTests" folder in "TwiKasa" target */,
-				92EC4D3B2F19E67900EA3C42 /* Exceptions for "TwiKasaTests" folder in "TwiKasaTests" target */,
-			);
-			path = TwiKasaTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -121,7 +121,7 @@
 			children = (
 				924108EF2E63E2C40094E1D6 /* .gitignore */,
 				92EC4D1A2F19E17100EA3C42 /* TwiKasa */,
-				92EC4D382F19E67900EA3C42 /* TwiKasaTests */,
+				92E93F8C2F20B0B800444852 /* TwiKasaTests */,
 				924108D02E62B1B90094E1D6 /* TwiKasaUITests */,
 				924108B72E62B1B80094E1D6 /* Products */,
 			);
@@ -153,8 +153,8 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				92E93F8C2F20B0B800444852 /* TwiKasaTests */,
 				92EC4D1A2F19E17100EA3C42 /* TwiKasa */,
-				92EC4D382F19E67900EA3C42 /* TwiKasaTests */,
 			);
 			name = TwiKasa;
 			packageProductDependencies = (
