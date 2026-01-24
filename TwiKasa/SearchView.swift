@@ -1,7 +1,15 @@
+//
+//  SearchView.swift
+//  TwiKasa
+//
+//  Created by Throw Catchers on 1/12/26.
+//
+
 import SwiftUI
 
 struct SearchView: View {
     @StateObject private var firestoreService = FirestoreService()
+    @AppStorage("showExplicitContent") private var showExplicitContent = true
     @State private var searchText = ""
     @State private var searchResults: [Entry] = []
     @State private var isSearching = false
@@ -12,6 +20,29 @@ struct SearchView: View {
     @State private var isLoadingTrending = false
     @State private var lastTrendingRefresh: Date?
     
+    private var filteredSearchResults: [Entry] {
+        guard !showExplicitContent else { return searchResults }
+        return searchResults.filter { entry in
+            !entry.definitions.contains(where: { $0.contentWarning })
+        }
+    }
+    
+    private var filteredTrendingWords: [Entry] {
+        let filtered = showExplicitContent ? trendingWords :
+            trendingWords.filter { entry in
+                !entry.definitions.contains(where: { $0.contentWarning })
+            }
+        return Array(filtered.prefix(10))
+    }
+    
+    private var filteredRecentSearches: [Entry] {
+        let filtered = showExplicitContent ? recentSearches :
+            recentSearches.filter { entry in
+                !entry.definitions.contains(where: { $0.contentWarning })
+            }
+        return Array(filtered.prefix(5))
+    }
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -21,7 +52,7 @@ struct SearchView: View {
                     loadingView
                 } else if searchText.isEmpty {
                     emptyStateView
-                } else if searchResults.isEmpty {
+                } else if filteredSearchResults.isEmpty {
                     noResultsView
                 } else {
                     resultsList
@@ -30,9 +61,10 @@ struct SearchView: View {
             .navigationTitle("Dictionary")
             .navigationBarTitleDisplayMode(.large)
             .task {
+                // Refresh trending words if empty OR if stale (older than 1 hour)
                 let shouldRefresh = trendingWords.isEmpty || {
                     guard let lastRefresh = lastTrendingRefresh else { return true }
-                    return Date().timeIntervalSince(lastRefresh) > 120 //should refresh every 2 mins
+                    return Date().timeIntervalSince(lastRefresh) > 600  // 10 mins
                 }()
                 
                 if shouldRefresh {
@@ -86,16 +118,11 @@ struct SearchView: View {
     private var resultsList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(searchResults) { entry in
+                ForEach(filteredSearchResults) { entry in
                     NavigationLink(value: entry) {
                         HorizontalWordCard(entry: entry)
                     }
                     .buttonStyle(.plain)
-                    .simultaneousGesture(
-                        TapGesture().onEnded {
-                            TrendingService.shared.trackSearch(entry.id)
-                        }
-                    )
                 }
             }
             .padding()
@@ -122,7 +149,7 @@ struct SearchView: View {
     private var emptyStateView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
-                if !recentSearches.isEmpty {
+                if !filteredRecentSearches.isEmpty {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Recent")
                             .font(.title)
@@ -130,7 +157,7 @@ struct SearchView: View {
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
-                                ForEach(recentSearches) { entry in
+                                ForEach(filteredRecentSearches) { entry in
                                     NavigationLink(value: entry) {
                                         WordCard(entry: entry)
                                     }
@@ -150,14 +177,14 @@ struct SearchView: View {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding()
-                    } else if trendingWords.isEmpty {
+                    } else if filteredTrendingWords.isEmpty {
                         Text("No trending words yet")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     } else {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
-                                ForEach(trendingWords) { entry in
+                                ForEach(filteredTrendingWords) { entry in
                                     NavigationLink(value: entry) {
                                         WordCard(entry: entry)
                                     }
@@ -228,7 +255,8 @@ struct SearchView: View {
         isLoadingTrending = true
         Task {
             do {
-                let words = try await TrendingService.shared.getTrendingWords(limit: 10)
+                // Fetch 100 to account for filtering explicit content
+                let words = try await TrendingService.shared.getTrendingWords(limit: 100)
                 await MainActor.run {
                     trendingWords = words
                     lastTrendingRefresh = Date()

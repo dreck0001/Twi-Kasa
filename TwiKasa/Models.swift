@@ -16,6 +16,8 @@ struct Definition: Codable, Identifiable, Hashable {
     let frequency: Int
     let tags: [String]
     let contentWarning: Bool
+    let imageExt: String
+    let audioExt: String
     
     enum CodingKeys: String, CodingKey {
         case definitionNumber
@@ -29,6 +31,8 @@ struct Definition: Codable, Identifiable, Hashable {
         case frequency
         case tags
         case contentWarning
+        case imageExt
+        case audioExt
     }
     
     init(
@@ -42,7 +46,9 @@ struct Definition: Codable, Identifiable, Hashable {
         morphology: String,
         frequency: Int,
         tags: [String],
-        contentWarning: Bool = false
+        contentWarning: Bool = false,
+        imageExt: String = "",
+        audioExt: String = ""
     ) {
         self.definitionNumber = definitionNumber
         self.partOfSpeech = partOfSpeech
@@ -55,6 +61,8 @@ struct Definition: Codable, Identifiable, Hashable {
         self.frequency = frequency
         self.tags = tags
         self.contentWarning = contentWarning
+        self.imageExt = imageExt
+        self.audioExt = audioExt
     }
     
     init(from decoder: Decoder) throws {
@@ -70,22 +78,46 @@ struct Definition: Codable, Identifiable, Hashable {
         frequency = try container.decode(Int.self, forKey: .frequency)
         tags = try container.decode([String].self, forKey: .tags)
         contentWarning = try container.decodeIfPresent(Bool.self, forKey: .contentWarning) ?? false
+        imageExt = try container.decodeIfPresent(String.self, forKey: .imageExt) ?? ""
+        audioExt = try container.decodeIfPresent(String.self, forKey: .audioExt) ?? ""
     }
     
-    func imageUrl(for parentNormalized: String) -> String {
-        "\(parentNormalized)-\(definitionNumber).jpg"
+    func imageFilename(for parentNormalized: String) -> String {
+        guard !imageExt.isEmpty else { return "" }
+        return "\(parentNormalized)-\(definitionNumber).\(imageExt)"
     }
     
-    func audioUrl(for parentNormalized: String) -> String {
-        "\(parentNormalized)-\(definitionNumber).mp3"
+    func audioFilename(for parentNormalized: String) -> String {
+        guard !audioExt.isEmpty else { return "" }
+        return "\(parentNormalized)-\(definitionNumber).\(audioExt)"
     }
     
     func fullImageUrl(for parentNormalized: String) -> String {
-        imageBaseURL + imageUrl(for: parentNormalized)
+        let filename = imageFilename(for: parentNormalized)
+        guard !filename.isEmpty else { return "" }
+        return imageBaseURL + filename
     }
     
-    func fullAudioUrl(for parentNormalized: String) -> String {
-        audioBaseURL + audioUrl(for: parentNormalized)
+    func possibleImageUrls(for parentNormalized: String) -> [String] {
+        if !imageExt.isEmpty {
+            return [fullImageUrl(for: parentNormalized)]
+        }
+        
+        // Try common image formats in order of preference
+        return ["jpg", "jpeg", "png"].map { ext in
+            "\(imageBaseURL)\(parentNormalized)-\(definitionNumber).\(ext)"
+        }
+    }
+    
+    func possibleAudioFilenames(for parentNormalized: String) -> [String] {
+        if !audioExt.isEmpty {
+            return [audioFilename(for: parentNormalized)]
+        }
+        
+        // Try common audio formats
+        return ["mp3", "m4a", "wav"].map { ext in
+            "\(parentNormalized)-\(definitionNumber).\(ext)"
+        }
     }
     
     static func == (lhs: Definition, rhs: Definition) -> Bool {

@@ -10,6 +10,7 @@ struct EntryDetailView: View {
     @State private var dragOffset: CGFloat = 0
     @State private var explicitContentRevealed = false
     @State private var isSwipingBack = false
+    @State private var showContentWarningTooltip = false
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var favoritesManager = FavoritesManager.shared
     
@@ -20,10 +21,6 @@ struct EntryDetailView: View {
                     headerSection
                     
                     VStack(alignment: .leading, spacing: 40) {
-                        if selectedDefinition.contentWarning {
-                            contentWarningBanner
-                        }
-                        
                         partOfSpeechTabs
                         
                         definitionsSection
@@ -157,36 +154,53 @@ struct EntryDetailView: View {
         .onDisappear {
             audioPlayer.stop()
         }
+        .overlay(
+            Group {
+                if showContentWarningTooltip {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showContentWarningTooltip = false
+                            }
+                        }
+                    
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                        
+                        VStack(spacing: 6) {
+                            Text("Explicit Content")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            
+                            Text("This definition contains explicit or sensitive language")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .padding(24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.ultraThickMaterial)
+                            .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
+                    )
+                    .padding(.horizontal, 40)
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+        )
         .onChange(of: selectedDefinitionIndex) { oldValue, newValue in
             explicitContentRevealed = false
+            showContentWarningTooltip = false
         }
-    }
-    
-    private var contentWarningBanner: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.orange)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Explicit Content")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                
-                Text("This definition contains explicit or sensitive language")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-        }
-        .padding()
-        .background(Color.orange.opacity(0.1))
-        .cornerRadius(12)
     }
     
     private var headerSection: some View {
         Group {
-            if currentImageUrl.isEmpty {
+            if currentImageUrls.isEmpty {
                 standardHeaderSection
                     .padding(.top, -100)
                     .transition(.opacity)
@@ -198,10 +212,8 @@ struct EntryDetailView: View {
         }
     }
     
-    private var currentImageUrl: String {
-        let url = selectedDefinition.fullImageUrl(for: entry.normalized)
-        print("DEBUG: Attempting to load image: \(url)")
-        return url
+    private var currentImageUrls: [URL] {
+        selectedDefinition.possibleImageUrls(for: entry.normalized).compactMap { URL(string: $0) }
     }
     
     private var shouldBlurImage: Bool {
@@ -209,7 +221,7 @@ struct EntryDetailView: View {
     }
     
     private var navigationOpacity: Double {
-        let threshold: CGFloat = !currentImageUrl.isEmpty ? 150 : 100
+        let threshold: CGFloat = !currentImageUrls.isEmpty ? 150 : 100
         let progress = min(max(-scrollOffset / threshold, 0), 1)
         return progress
     }
@@ -219,8 +231,17 @@ struct EntryDetailView: View {
     }
     
     private var audioFileExists: Bool {
-        let filename = selectedDefinition.audioUrl(for: entry.normalized).replacingOccurrences(of: ".mp3", with: "")
-        return Bundle.main.url(forResource: filename, withExtension: "mp3") != nil
+        let possibleFilenames = selectedDefinition.possibleAudioFilenames(for: entry.normalized)
+        for filename in possibleFilenames {
+            let components = filename.split(separator: ".")
+            guard components.count == 2 else { continue }
+            let name = String(components[0])
+            let ext = String(components[1])
+            if Bundle.main.url(forResource: name, withExtension: ext) != nil {
+                return true
+            }
+        }
+        return false
     }
     
     private var headerGradient: LinearGradient {
@@ -256,7 +277,7 @@ struct EntryDetailView: View {
     
     private var imageHeaderSection: some View {
         GeometryReader { geometry in
-            CachedAsyncImage(url: URL(string: currentImageUrl)) { phase in
+            CachedAsyncImage(urls: currentImageUrls) { phase in
                 switch phase {
                 case .success(let image):
                     image
@@ -329,7 +350,7 @@ struct EntryDetailView: View {
                                                     .foregroundColor(.white)
                                                     .contentShape(Rectangle())
                                                     .onTapGesture {
-                                                        audioPlayer.play(filename: selectedDefinition.audioUrl(for: entry.normalized))
+                                                        audioPlayer.play(filenames: selectedDefinition.possibleAudioFilenames(for: entry.normalized))
                                                     }
                                             }
                                         }
@@ -362,7 +383,7 @@ struct EntryDetailView: View {
             }
         }
         .frame(height: (UIScreen.main.bounds.height * 2 / 5) + 100)
-        .id(currentImageUrl)
+        .id(currentImageUrls.first?.absoluteString ?? "")
         .transition(.opacity)
     }
     
@@ -389,7 +410,7 @@ struct EntryDetailView: View {
                                 .foregroundColor(.white)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
-                                    audioPlayer.play(filename: selectedDefinition.audioUrl(for: entry.normalized))
+                                    audioPlayer.play(filenames: selectedDefinition.possibleAudioFilenames(for: entry.normalized))
                                 }
                         }
                     }
@@ -414,14 +435,19 @@ struct EntryDetailView: View {
                         }
                     } label: {
                         HStack(spacing: 4) {
-                            if definition.contentWarning {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.caption2)
-                                    .foregroundColor(selectedDefinitionIndex == index ? .white : .orange)
-                            }
-                            
                             Text(definition.partOfSpeech)
                                 .font(.subheadline)
+                            
+                            if definition.contentWarning {
+                                Image(systemName: "info.circle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(selectedDefinitionIndex == index ? .white.opacity(0.8) : .orange)
+                                    .onTapGesture {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            showContentWarningTooltip = true
+                                        }
+                                    }
+                            }
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)

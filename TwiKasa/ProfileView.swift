@@ -1,35 +1,37 @@
-//
-//  ProfileView.swift
-//  TwiKasa
-//
-//  Created by Throw Catchers on 1/12/26.
-//
-
 import SwiftUI
 
 struct ProfileView: View {
+    @AppStorage("showExplicitContent") private var showExplicitContent = true
+    
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 64))
-                    .foregroundColor(.gray)
+            Form {
+                Section {
+                    Toggle(isOn: $showExplicitContent) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Show Explicit Content")
+                                .font(.body)
+                            Text("Display words with explicit or sensitive meanings")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Content Filtering")
+                }
                 
-                Text("Profile")
-                    .font(.title)
-                    .fontWeight(.bold)
-                
-                Text("Settings & preferences")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                Text("Coming soon!")
-                    .font(.caption)
-                    .foregroundColor(.red.opacity(0.8))
-                    .padding(.top)
+                Section {
+                    HStack {
+                        Text("App Version")
+                        Spacer()
+                        Text("1.0.0")
+                            .foregroundColor(.secondary)
+                    }
+                } header: {
+                    Text("About")
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("Profile")
+            .navigationTitle("Settings")
         }
     }
 }

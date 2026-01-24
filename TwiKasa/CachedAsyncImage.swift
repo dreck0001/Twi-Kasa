@@ -1,14 +1,19 @@
 import SwiftUI
 
 struct CachedAsyncImage<Content: View>: View {
-    let url: URL?
+    let urls: [URL]
     let content: (AsyncImagePhase) -> Content
     
     @State private var phase: AsyncImagePhase = .empty
     @State private var isLoading = false
     
     init(url: URL?, @ViewBuilder content: @escaping (AsyncImagePhase) -> Content) {
-        self.url = url
+        self.urls = url.map { [$0] } ?? []
+        self.content = content
+    }
+    
+    init(urls: [URL], @ViewBuilder content: @escaping (AsyncImagePhase) -> Content) {
+        self.urls = urls
         self.content = content
     }
     
@@ -20,19 +25,10 @@ struct CachedAsyncImage<Content: View>: View {
     }
     
     private func loadImage() {
-        guard let url = url, !isLoading else {
-            if url == nil {
+        guard !urls.isEmpty, !isLoading else {
+            if urls.isEmpty {
                 phase = .empty
             }
-            return
-        }
-        
-        let urlString = url.absoluteString
-        print("CachedAsyncImage: Loading \(urlString)")
-        
-        if let cachedImage = ImageCache.shared.get(url: urlString) {
-            print("CachedAsyncImage: Found in cache")
-            phase = .success(Image(uiImage: cachedImage))
             return
         }
         
@@ -40,44 +36,52 @@ struct CachedAsyncImage<Content: View>: View {
         phase = .empty
         
         Task {
+            await tryLoadingUrls(urls)
+        }
+    }
+    
+    private func tryLoadingUrls(_ urls: [URL]) async {
+        for url in urls {
+            let urlString = url.absoluteString
+            
+            // Check cache first
+            if let cachedImage = ImageCache.shared.get(url: urlString) {
+                await MainActor.run {
+                    phase = .success(Image(uiImage: cachedImage))
+                    isLoading = false
+                }
+                return
+            }
+            
+            // Try downloading
             do {
                 let (data, response) = try await URLSession.shared.data(from: url)
                 
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("CachedAsyncImage: HTTP status \(httpResponse.statusCode)")
-                    guard httpResponse.statusCode == 200 else {
-                        let error = URLError(.badServerResponse)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    continue
+                }
+                
+                if httpResponse.statusCode == 200 {
+                    if let downloadedImage = UIImage(data: data) {
+                        ImageCache.shared.set(url: urlString, image: downloadedImage)
+                        
                         await MainActor.run {
-                            phase = .failure(error)
+                            phase = .success(Image(uiImage: downloadedImage))
                             isLoading = false
                         }
                         return
                     }
                 }
-                
-                if let downloadedImage = UIImage(data: data) {
-                    print("CachedAsyncImage: Successfully loaded image")
-                    ImageCache.shared.set(url: urlString, image: downloadedImage)
-                    
-                    await MainActor.run {
-                        phase = .success(Image(uiImage: downloadedImage))
-                        isLoading = false
-                    }
-                } else {
-                    print("CachedAsyncImage: Failed to decode image data")
-                    let error = URLError(.cannotDecodeContentData)
-                    await MainActor.run {
-                        phase = .failure(error)
-                        isLoading = false
-                    }
-                }
             } catch {
-                print("CachedAsyncImage: Error - \(error)")
-                await MainActor.run {
-                    phase = .failure(error)
-                    isLoading = false
-                }
+                // Try next URL
+                continue
             }
+        }
+        
+        // All URLs failed
+        await MainActor.run {
+            phase = .failure(URLError(.cannotDecodeContentData))
+            isLoading = false
         }
     }
 }

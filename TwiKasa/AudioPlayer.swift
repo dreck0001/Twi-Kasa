@@ -10,20 +10,27 @@ class AudioPlayer: NSObject, ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(true)
     }
     
-    func play(filename: String) {
-        let nameWithoutExt = filename.replacingOccurrences(of: ".mp3", with: "")
-        
-        guard let url = Bundle.main.url(forResource: nameWithoutExt, withExtension: "mp3") else {
-            return
-        }
-        
-        do {
-            player = try AVAudioPlayer(contentsOf: url)
-            player?.delegate = self
-            player?.play()
-            isPlaying = true
-        } catch {
-            print("Audio playback failed: \(error.localizedDescription)")
+    func play(filenames: [String]) {
+        for filename in filenames {
+            let components = filename.split(separator: ".")
+            guard components.count == 2 else { continue }
+            
+            let nameWithoutExt = String(components[0])
+            let ext = String(components[1])
+            
+            guard let url = Bundle.main.url(forResource: nameWithoutExt, withExtension: ext) else {
+                continue
+            }
+            
+            do {
+                player = try AVAudioPlayer(contentsOf: url)
+                player?.delegate = self
+                player?.play()
+                isPlaying = true
+                return
+            } catch {
+                continue
+            }
         }
     }
     
