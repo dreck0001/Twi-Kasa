@@ -12,7 +12,7 @@ struct ContentView: View {
         TabView {
             SearchView()
                 .tabItem {
-                    Label("Dictionary", systemImage: "book.closed")
+                    Label("Dictionary", systemImage: "magnifyingglass")
                 }
             
             FavoritesView()
@@ -25,14 +25,16 @@ struct ContentView: View {
                     Label("Learn", systemImage: "graduationcap.fill")
                 }
             
-            ProfileView()
+            SettingsView()
                 .tabItem {
-                    Label("Profile", systemImage: "person.circle.fill")
+                    Label("Settings", systemImage: "gearshape.fill")
                 }
-        }        .tint(.red.opacity(0.8))
+        }
+        .tint(.red.opacity(0.8))
     }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(DeepLinkManager.shared)
 }

@@ -127,9 +127,23 @@ struct EntryDetailView: View {
                             
                             HStack(spacing: 12) {
                                 Button {
+                                    favoritesManager.toggleFavorite(entry.id)
+                                } label: {
+                                    Image(systemName: favoritesManager.isFavorited(entry.id) ? "star.fill" : "star")
+                                        .font(.title3)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(favoritesManager.isFavorited(entry.id) ? .yellow : .primary)
+                                        .frame(width: 32, height: 32)
+                                        .background(
+                                            Circle()
+                                                .fill(.ultraThinMaterial)
+                                        )
+                                }
+                                
+                                Button {
                                     showShareSheet = true
                                 } label: {
-                                    Image(systemName: "square.and.arrow.up")
+                                    Image(systemName: "arrowshape.turn.up.right.fill")
                                         .font(.title3)
                                         .fontWeight(.semibold)
                                         .foregroundColor(.primary)
@@ -140,13 +154,35 @@ struct EntryDetailView: View {
                                         )
                                 }
                                 
-                                Button {
-                                    favoritesManager.toggleFavorite(entry.id)
+                                Menu {
+                                    Button {
+                                        // not implemented yet
+                                    } label: {
+                                        Label("Report Issue", systemImage: "exclamationmark.bubble")
+                                    }
+                                    
+                                    Button {
+                                        // not implemented yet
+                                    } label: {
+                                        Label("Suggest Edit", systemImage: "pencil")
+                                    }
+                                    
+                                    Button {
+                                        UIPasteboard.general.string = entry.headword
+                                    } label: {
+                                        Label("Copy Word", systemImage: "doc.on.doc")
+                                    }
+                                    
+                                    Button {
+                                        // not implemented yet
+                                    } label: {
+                                        Label("Add to Flashcards", systemImage: "rectangle.stack.badge.plus")
+                                    }
                                 } label: {
-                                    Image(systemName: favoritesManager.isFavorited(entry.id) ? "star.fill" : "star")
+                                    Image(systemName: "ellipsis")
                                         .font(.title3)
                                         .fontWeight(.semibold)
-                                        .foregroundColor(favoritesManager.isFavorited(entry.id) ? .yellow : .primary)
+                                        .foregroundColor(.primary)
                                         .frame(width: 32, height: 32)
                                         .background(
                                             Circle()
@@ -168,7 +204,7 @@ struct EntryDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             TrendingService.shared.trackView(entry.id)
-            loadShareImage()
+            generateShareCard()
             loadViewCount()
         }
         .onDisappear {
@@ -215,11 +251,11 @@ struct EntryDetailView: View {
         .onChange(of: selectedDefinitionIndex) { oldValue, newValue in
             explicitContentRevealed = false
             showContentWarningTooltip = false
-            loadShareImage()
+            generateShareCard()
         }
         .sheet(isPresented: $showShareSheet) {
-            if let image = shareImage {
-                ShareViewController(activityItems: [shareText, image])
+            if let url = shareURL {
+                ShareViewController(activityItems: [shareText, url])
             } else {
                 ShareViewController(activityItems: [shareText])
             }
@@ -268,49 +304,63 @@ struct EntryDetailView: View {
         let pos = selectedDefinition.partOfSpeech
         let definition = selectedDefinition.enDefinition
         
+        // swap this out once we're on the App Store
+        let appStoreLink = "https://apps.apple.com/app/twikasa/id123456789"
+        
         return """
         \(word)\(ipa) (\(pos))
         
         \(definition)
         
-        Learn more Twi words with TwiKasa 📚
+        Download TwiKasa: \(appStoreLink)
         """
     }
     
-    private func loadShareImage() {
-        guard !currentImageUrls.isEmpty else { return }
-        
+    private var shareURL: URL? {
+        URL(string: "https://apps.apple.com/app/twikasa/id123456789")
+    }
+    
+    private func generateShareCard() {
         Task {
-            for url in currentImageUrls {
-                let urlString = url.absoluteString
-                
-                // Check cache first
-                if let cachedImage = ImageCache.shared.get(url: urlString) {
-                    await MainActor.run {
-                        shareImage = cachedImage
-                    }
-                    return
-                }
-                
-                // Try downloading
-                do {
-                    let (data, response) = try await URLSession.shared.data(from: url)
+            var cardImage: UIImage? = nil
+            
+            if !currentImageUrls.isEmpty {
+                for url in currentImageUrls {
+                    let urlString = url.absoluteString
                     
-                    guard let httpResponse = response as? HTTPURLResponse,
-                          httpResponse.statusCode == 200,
-                          let downloadedImage = UIImage(data: data) else {
+                    if let cachedImage = ImageCache.shared.get(url: urlString) {
+                        cardImage = cachedImage
+                        break
+                    }
+                    
+                    do {
+                        let (data, response) = try await URLSession.shared.data(from: url)
+                        
+                        guard let httpResponse = response as? HTTPURLResponse,
+                              httpResponse.statusCode == 200,
+                              let downloadedImage = UIImage(data: data) else {
+                            continue
+                        }
+                        
+                        ImageCache.shared.set(url: urlString, image: downloadedImage)
+                        cardImage = downloadedImage
+                        break
+                    } catch {
                         continue
                     }
-                    
-                    ImageCache.shared.set(url: urlString, image: downloadedImage)
-                    
-                    await MainActor.run {
-                        shareImage = downloadedImage
-                    }
-                    return
-                } catch {
-                    continue
                 }
+            }
+            
+            await MainActor.run {
+                let card = ShareCardView(
+                    headword: entry.headword,
+                    ipa: entry.ipa,
+                    partOfSpeech: selectedDefinition.partOfSpeech,
+                    twiDefinition: selectedDefinition.twiDefinition,
+                    enDefinition: selectedDefinition.enDefinition,
+                    image: cardImage
+                )
+                shareImage = card.render()
             }
         }
     }
@@ -368,7 +418,7 @@ struct EntryDetailView: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: geometry.size.width, height: geometry.size.width)  // Force square
+                        .frame(width: geometry.size.width, height: geometry.size.width)
                         .clipped()
                         .blur(radius: shouldBlurImage ? 30 : 0)
                         .overlay(
@@ -395,7 +445,6 @@ struct EntryDetailView: View {
                         )
                         .overlay(
                             VStack(spacing: 0) {
-                                // Top edge gradient (10% of image)
                                 LinearGradient(
                                     colors: [Color(UIColor.systemBackground), Color(UIColor.systemBackground).opacity(0)],
                                     startPoint: .top,
@@ -405,7 +454,6 @@ struct EntryDetailView: View {
                                 
                                 Spacer()
                                 
-                                // Bottom edge gradient (10% of image)
                                 LinearGradient(
                                     colors: [Color(UIColor.systemBackground).opacity(0), Color(UIColor.systemBackground)],
                                     startPoint: .top,
@@ -478,7 +526,7 @@ struct EntryDetailView: View {
                 }
             }
         }
-        .frame(height: UIScreen.main.bounds.width)  //pure square
+        .frame(height: UIScreen.main.bounds.width)
         .id(currentImageUrls.first?.absoluteString ?? "")
         .transition(.opacity)
     }
@@ -526,51 +574,57 @@ struct EntryDetailView: View {
             .padding()
             .padding(.bottom, 8)
         }
-        .frame(height: UIScreen.main.bounds.width)  //pure square
+        .frame(height: UIScreen.main.bounds.width)
         .background(headerGradient)
     }
     
     private var partOfSpeechTabs: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(Array(entry.definitions.enumerated()), id: \.offset) { index, definition in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedDefinitionIndex = index
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(definition.partOfSpeech)
-                                .font(.subheadline)
-                            
-                            if definition.contentWarning {
-                                Image(systemName: "info.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(selectedDefinitionIndex == index ? .white.opacity(0.8) : .orange)
-                                    .onTapGesture {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
-                                            showContentWarningTooltip = true
-                                        }
-                                    }
+        HStack {
+            Spacer(minLength: 0)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(entry.definitions.enumerated()), id: \.offset) { index, definition in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedDefinitionIndex = index
                             }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(definition.partOfSpeech)
+                                    .font(.subheadline)
+                                
+                                if definition.contentWarning {
+                                    Image(systemName: "info.circle.fill")
+                                        .font(.caption)
+                                        .foregroundColor(selectedDefinitionIndex == index ? .white.opacity(0.8) : .orange)
+                                        .onTapGesture {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                showContentWarningTooltip = true
+                                            }
+                                        }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                selectedDefinitionIndex == index ?
+                                Color.blue : Color.gray.opacity(0.2)
+                            )
+                            .foregroundColor(
+                                selectedDefinitionIndex == index ?
+                                .white : .primary
+                            )
+                            .cornerRadius(8)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            selectedDefinitionIndex == index ?
-                            Color.blue : Color.gray.opacity(0.2)
-                        )
-                        .foregroundColor(
-                            selectedDefinitionIndex == index ?
-                            .white : .primary
-                        )
-                        .cornerRadius(8)
                     }
                 }
             }
-            .frame(maxWidth: .infinity)
+            .scrollBounceBehavior(.basedOnSize)
+            .fixedSize(horizontal: true, vertical: false)
+            
+            Spacer(minLength: 0)
         }
-        .scrollBounceBehavior(.basedOnSize)
     }
     
     private var definitionsSection: some View {
@@ -784,7 +838,6 @@ struct EntryDetailView: View {
                     viewCount = count
                 }
             } catch {
-                //not critical
             }
         }
     }

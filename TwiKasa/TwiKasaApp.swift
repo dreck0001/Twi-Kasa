@@ -4,6 +4,7 @@ import FirebaseAuth
 
 @main
 struct TwiKasaApp: App {
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
     
     init() {
         FirebaseApp.configure()
@@ -16,6 +17,10 @@ struct TwiKasaApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(deepLinkManager)
+                .onOpenURL { url in
+                    _ = deepLinkManager.handleURL(url)
+                }
         }
     }
 }

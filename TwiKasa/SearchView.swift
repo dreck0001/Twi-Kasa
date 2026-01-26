@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SearchView: View {
     @StateObject private var firestoreService = FirestoreService()
+    @EnvironmentObject private var deepLinkManager: DeepLinkManager
     @State private var searchText = ""
     @State private var searchResults: [Entry] = []
     @State private var isSearching = false
@@ -18,9 +19,10 @@ struct SearchView: View {
     @State private var recentSearches: [Entry] = []
     @State private var isLoadingTrending = false
     @State private var lastTrendingRefresh: Date?
+    @State private var navigationPath = NavigationPath()
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
                 searchBar
                 
@@ -36,11 +38,16 @@ struct SearchView: View {
             }
             .navigationTitle("Dictionary")
             .navigationBarTitleDisplayMode(.large)
+            .navigationDestination(for: Entry.self) { entry in
+                EntryDetailView(entry: entry)
+                    .onAppear {
+                        saveRecentSearch(entry)
+                    }
+            }
             .task {
-                // Refresh trending words if empty OR if stale (older than 1 hour)
                 let shouldRefresh = trendingWords.isEmpty || {
                     guard let lastRefresh = lastTrendingRefresh else { return true }
-                    return Date().timeIntervalSince(lastRefresh) > 3600  // 1 hour
+                    return Date().timeIntervalSince(lastRefresh) > 3600
                 }()
                 
                 if shouldRefresh {
@@ -48,6 +55,15 @@ struct SearchView: View {
                 }
                 
                 loadRecentSearches()
+            }
+            .onChange(of: deepLinkManager.pendingEntryId) { _, entryId in
+                guard let entryId = entryId else { return }
+                handleDeepLink(entryId: entryId)
+            }
+            .onAppear {
+                if let entryId = deepLinkManager.pendingEntryId {
+                    handleDeepLink(entryId: entryId)
+                }
             }
         }
         .tint(.red.opacity(0.8))
@@ -102,12 +118,6 @@ struct SearchView: View {
                 }
             }
             .padding()
-        }
-        .navigationDestination(for: Entry.self) { entry in
-            EntryDetailView(entry: entry)
-                .onAppear {
-                    saveRecentSearch(entry)
-                }
         }
     }
     
@@ -173,12 +183,6 @@ struct SearchView: View {
             }
             .padding()
         }
-        .navigationDestination(for: Entry.self) { entry in
-            EntryDetailView(entry: entry)
-                .onAppear {
-                    saveRecentSearch(entry)
-                }
-        }
     }
     
     private var noResultsView: some View {
@@ -227,6 +231,21 @@ struct SearchView: View {
         }
     }
     
+    private func handleDeepLink(entryId: String) {
+        Task {
+            if let entry = try? await firestoreService.getEntry(id: entryId) {
+                await MainActor.run {
+                    navigationPath.append(entry)
+                    deepLinkManager.clearPending()
+                }
+            } else {
+                await MainActor.run {
+                    deepLinkManager.clearPending()
+                }
+            }
+        }
+    }
+    
     private func loadTrendingWords() {
         isLoadingTrending = true
         Task {
@@ -234,7 +253,7 @@ struct SearchView: View {
                 let words = try await firestoreService.getCommonWords(limit: 10)
                 await MainActor.run {
                     trendingWords = words
-                    lastTrendingRefresh = Date()  // Track when we last refreshed
+                    lastTrendingRefresh = Date()
                     isLoadingTrending = false
                 }
             } catch {
@@ -390,4 +409,5 @@ struct WordCard: View {
 
 #Preview {
     SearchView()
+        .environmentObject(DeepLinkManager.shared)
 }

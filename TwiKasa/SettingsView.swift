@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ProfileView: View {
+struct SettingsView: View {
     @AppStorage("showExplicitContent") private var showExplicitContent = true
     
     var body: some View {
@@ -37,5 +37,5 @@ struct ProfileView: View {
 }
 
 #Preview {
-    ProfileView()
+    SettingsView()
 }
