@@ -11,6 +11,9 @@ struct EntryDetailView: View {
     @State private var explicitContentRevealed = false
     @State private var isSwipingBack = false
     @State private var showContentWarningTooltip = false
+    @State private var shareImage: UIImage?
+    @State private var showShareSheet = false
+    @State private var viewCount: Int = 0
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var favoritesManager = FavoritesManager.shared
     
@@ -43,9 +46,10 @@ struct EntryDetailView: View {
                             tagsSection
                         }
                         
-                        frequencySection
+                        viewCountSection
                     }
                     .padding()
+                    .padding(.bottom, 20)
                     .background(Color(.systemBackground))
                 }
                 .background(GeometryReader { geometry in
@@ -60,7 +64,7 @@ struct EntryDetailView: View {
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                 scrollOffset = value
             }
-            .ignoresSafeArea()
+            .ignoresSafeArea(edges: .top)
             .offset(x: dragOffset)
             .gesture(
                 DragGesture(minimumDistance: 20)
@@ -68,7 +72,6 @@ struct EntryDetailView: View {
                         let horizontalAmount = gesture.translation.width
                         let verticalAmount = abs(gesture.translation.height)
                         
-                        // Only allow horizontal swipe if it's primarily horizontal
                         if horizontalAmount > verticalAmount && horizontalAmount > 0 && scrollOffset >= 0 {
                             isSwipingBack = true
                             dragOffset = horizontalAmount
@@ -79,7 +82,6 @@ struct EntryDetailView: View {
                         let horizontalAmount = gesture.translation.width
                         let verticalAmount = abs(gesture.translation.height)
                         
-                        // Only dismiss if gesture was primarily horizontal
                         if horizontalAmount > verticalAmount && horizontalAmount > 100 {
                             dismiss()
                         } else {
@@ -123,18 +125,34 @@ struct EntryDetailView: View {
                             
                             Spacer()
                             
-                            Button {
-                                favoritesManager.toggleFavorite(entry.id)
-                            } label: {
-                                Image(systemName: favoritesManager.isFavorited(entry.id) ? "star.fill" : "star")
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(favoritesManager.isFavorited(entry.id) ? .yellow : .primary)
-                                    .frame(width: 32, height: 32)
-                                    .background(
-                                        Circle()
-                                            .fill(.ultraThinMaterial)
-                                    )
+                            HStack(spacing: 12) {
+                                Button {
+                                    showShareSheet = true
+                                } label: {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.title3)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.primary)
+                                        .frame(width: 32, height: 32)
+                                        .background(
+                                            Circle()
+                                                .fill(.ultraThinMaterial)
+                                        )
+                                }
+                                
+                                Button {
+                                    favoritesManager.toggleFavorite(entry.id)
+                                } label: {
+                                    Image(systemName: favoritesManager.isFavorited(entry.id) ? "star.fill" : "star")
+                                        .font(.title3)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(favoritesManager.isFavorited(entry.id) ? .yellow : .primary)
+                                        .frame(width: 32, height: 32)
+                                        .background(
+                                            Circle()
+                                                .fill(.ultraThinMaterial)
+                                        )
+                                }
                             }
                         }
                         .padding(.horizontal, 16)
@@ -150,6 +168,8 @@ struct EntryDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             TrendingService.shared.trackView(entry.id)
+            loadShareImage()
+            loadViewCount()
         }
         .onDisappear {
             audioPlayer.stop()
@@ -195,6 +215,14 @@ struct EntryDetailView: View {
         .onChange(of: selectedDefinitionIndex) { oldValue, newValue in
             explicitContentRevealed = false
             showContentWarningTooltip = false
+            loadShareImage()
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let image = shareImage {
+                ShareViewController(activityItems: [shareText, image])
+            } else {
+                ShareViewController(activityItems: [shareText])
+            }
         }
     }
     
@@ -202,18 +230,22 @@ struct EntryDetailView: View {
         Group {
             if currentImageUrls.isEmpty {
                 standardHeaderSection
-                    .padding(.top, -100)
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.3), value: selectedDefinitionIndex)
             } else {
                 imageHeaderSection
-                    .padding(.top, -100)
             }
         }
     }
     
     private var currentImageUrls: [URL] {
-        selectedDefinition.possibleImageUrls(for: entry.normalized).compactMap { URL(string: $0) }
+        if selectedDefinition.hasImage {
+            return [URL(string: selectedDefinition.fullImageUrl)].compactMap { $0 }
+        }
+        if !entry.imageUrl.isEmpty {
+            return [URL(string: entry.fullImageUrl)].compactMap { $0 }
+        }
+        return []
     }
     
     private var shouldBlurImage: Bool {
@@ -228,6 +260,59 @@ struct EntryDetailView: View {
     
     private var selectedDefinition: Definition {
         entry.definitions[selectedDefinitionIndex]
+    }
+    
+    private var shareText: String {
+        let word = entry.headword
+        let ipa = entry.ipa.isEmpty ? "" : " /\(entry.ipa)/"
+        let pos = selectedDefinition.partOfSpeech
+        let definition = selectedDefinition.enDefinition
+        
+        return """
+        \(word)\(ipa) (\(pos))
+        
+        \(definition)
+        
+        Learn more Twi words with TwiKasa 📚
+        """
+    }
+    
+    private func loadShareImage() {
+        guard !currentImageUrls.isEmpty else { return }
+        
+        Task {
+            for url in currentImageUrls {
+                let urlString = url.absoluteString
+                
+                // Check cache first
+                if let cachedImage = ImageCache.shared.get(url: urlString) {
+                    await MainActor.run {
+                        shareImage = cachedImage
+                    }
+                    return
+                }
+                
+                // Try downloading
+                do {
+                    let (data, response) = try await URLSession.shared.data(from: url)
+                    
+                    guard let httpResponse = response as? HTTPURLResponse,
+                          httpResponse.statusCode == 200,
+                          let downloadedImage = UIImage(data: data) else {
+                        continue
+                    }
+                    
+                    ImageCache.shared.set(url: urlString, image: downloadedImage)
+                    
+                    await MainActor.run {
+                        shareImage = downloadedImage
+                    }
+                    return
+                } catch {
+                    continue
+                }
+            }
+        }
     }
     
     private var audioFileExists: Bool {
@@ -277,13 +362,13 @@ struct EntryDetailView: View {
     
     private var imageHeaderSection: some View {
         GeometryReader { geometry in
-            CachedAsyncImage(urls: currentImageUrls) { phase in
+            CachedAsyncImage(urls: currentImageUrls) { phase, imageSize in
                 switch phase {
                 case .success(let image):
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: geometry.size.width, height: geometry.size.width)  // Force square
                         .clipped()
                         .blur(radius: shouldBlurImage ? 30 : 0)
                         .overlay(
@@ -310,21 +395,23 @@ struct EntryDetailView: View {
                         )
                         .overlay(
                             VStack(spacing: 0) {
+                                // Top edge gradient (10% of image)
                                 LinearGradient(
-                                    colors: [Color.black.opacity(0.4), Color.clear],
+                                    colors: [Color(UIColor.systemBackground), Color(UIColor.systemBackground).opacity(0)],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
-                                .frame(height: 120)
+                                .frame(height: geometry.size.width * 0.1)
                                 
                                 Spacer()
                                 
+                                // Bottom edge gradient (10% of image)
                                 LinearGradient(
-                                    colors: [Color.clear, Color.black.opacity(0.7)],
+                                    colors: [Color(UIColor.systemBackground).opacity(0), Color(UIColor.systemBackground)],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
-                                .frame(height: 150)
+                                .frame(height: geometry.size.width * 0.1)
                             }
                         )
                         .overlay(
@@ -337,22 +424,31 @@ struct EntryDetailView: View {
                                             .font(.system(size: 48, weight: .bold))
                                             .foregroundColor(.white)
                                         
-                                        HStack(spacing: 8) {
-                                            if !entry.ipa.isEmpty {
-                                                Text("/\(entry.ipa)/")
-                                                    .font(.title3)
-                                                    .foregroundColor(.white)
-                                            }
-                                            
-                                            if audioFileExists {
-                                                Image(systemName: "speaker.wave.2.fill")
-                                                    .font(.title3)
-                                                    .foregroundColor(.white)
-                                                    .contentShape(Rectangle())
-                                                    .onTapGesture {
-                                                        audioPlayer.play(filenames: selectedDefinition.possibleAudioFilenames(for: entry.normalized))
+                                        if !entry.ipa.isEmpty || audioFileExists {
+                                            Button {
+                                                if audioFileExists {
+                                                    audioPlayer.play(filenames: selectedDefinition.possibleAudioFilenames(for: entry.normalized))
+                                                }
+                                            } label: {
+                                                HStack(spacing: 6) {
+                                                    if !entry.ipa.isEmpty {
+                                                        Text("/\(entry.ipa)/")
+                                                            .font(.title3)
+                                                            .foregroundColor(.white)
                                                     }
+                                                    
+                                                    if audioFileExists {
+                                                        Image(systemName: "speaker.wave.2.fill")
+                                                            .font(.title3)
+                                                            .foregroundColor(.white)
+                                                    }
+                                                }
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 6)
+                                                .background(Color.white.opacity(0.15))
+                                                .cornerRadius(8)
                                             }
+                                            .buttonStyle(.plain)
                                         }
                                     }
                                     
@@ -382,7 +478,7 @@ struct EntryDetailView: View {
                 }
             }
         }
-        .frame(height: (UIScreen.main.bounds.height * 2 / 5) + 100)
+        .frame(height: UIScreen.main.bounds.width)  //pure square
         .id(currentImageUrls.first?.absoluteString ?? "")
         .transition(.opacity)
     }
@@ -397,22 +493,31 @@ struct EntryDetailView: View {
                         .font(.system(size: 48, weight: .bold))
                         .foregroundColor(.white)
                     
-                    HStack(spacing: 8) {
-                        if !entry.ipa.isEmpty {
-                            Text("/\(entry.ipa)/")
-                                .font(.title3)
-                                .foregroundColor(.white)
-                        }
-                        
-                        if audioFileExists {
-                            Image(systemName: "speaker.wave.2.fill")
-                                .font(.title3)
-                                .foregroundColor(.white)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    audioPlayer.play(filenames: selectedDefinition.possibleAudioFilenames(for: entry.normalized))
+                    if !entry.ipa.isEmpty || audioFileExists {
+                        Button {
+                            if audioFileExists {
+                                audioPlayer.play(filenames: selectedDefinition.possibleAudioFilenames(for: entry.normalized))
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                if !entry.ipa.isEmpty {
+                                    Text("/\(entry.ipa)/")
+                                        .font(.title3)
+                                        .foregroundColor(.white)
                                 }
+                                
+                                if audioFileExists {
+                                    Image(systemName: "speaker.wave.2.fill")
+                                        .font(.title3)
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.15))
+                            .cornerRadius(8)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
                 
@@ -421,7 +526,7 @@ struct EntryDetailView: View {
             .padding()
             .padding(.bottom, 8)
         }
-        .frame(height: (UIScreen.main.bounds.height * 2 / 5) + 100)
+        .frame(height: UIScreen.main.bounds.width)  //pure square
         .background(headerGradient)
     }
     
@@ -463,105 +568,108 @@ struct EntryDetailView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity)
         }
+        .scrollBounceBehavior(.basedOnSize)
     }
     
     private var definitionsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("DEFINITIONS \(entry.definitions.count)")
+        VStack(alignment: .leading, spacing: 12) {
+            Divider()
+                .padding(.bottom, 8)
+            
+            Text("DEFINITION")
                 .font(.caption)
                 .fontWeight(.bold)
                 .foregroundColor(.primary)
                 .textCase(.uppercase)
             
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top) {
-                    Text("1.")
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                    
-                    Text(selectedDefinition.enDefinition)
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-                
-                if !selectedDefinition.twiDefinition.isEmpty {
-                    HStack(alignment: .top) {
-                        Text("•")
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if !selectedDefinition.twiDefinition.isEmpty {
+                        Text(selectedDefinition.twiDefinition.prefix(1).uppercased() + selectedDefinition.twiDefinition.dropFirst())
                             .font(.body)
-                            .foregroundColor(.secondary)
-                        
-                        Text(selectedDefinition.twiDefinition)
-                            .font(.body)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.primary)
                     }
+                    
+                    Text(selectedDefinition.enDefinition.prefix(1).uppercased() + selectedDefinition.enDefinition.dropFirst())
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .italic()
                 }
             }
         }
     }
     
     private var synonymsAntonymsSection: some View {
-        HStack(alignment: .top, spacing: 40) {
-            if !selectedDefinition.synonyms.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("SYNONYMS \(selectedDefinition.synonyms.count)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                        .textCase(.uppercase)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(selectedDefinition.synonyms.prefix(7), id: \.self) { synonym in
-                            Text(synonym)
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                        }
+        VStack(alignment: .leading, spacing: 0) {
+            Divider()
+                .padding(.bottom, 20)
+            
+            HStack(alignment: .top, spacing: 40) {
+                if !selectedDefinition.synonyms.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("SYNONYMS")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                            .textCase(.uppercase)
                         
-                        if selectedDefinition.synonyms.count > 7 {
-                            Text("...")
-                                .foregroundColor(.secondary)
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(selectedDefinition.synonyms.prefix(7), id: \.self) { synonym in
+                                Text(synonym.prefix(1).uppercased() + synonym.dropFirst())
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            if selectedDefinition.synonyms.count > 7 {
+                                Text("...")
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
                 }
-            }
-            
-            if !selectedDefinition.antonyms.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("ANTONYMS \(selectedDefinition.antonyms.count)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                        .textCase(.uppercase)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(selectedDefinition.antonyms.prefix(4), id: \.self) { antonym in
-                            Text(antonym)
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                        }
+                
+                if !selectedDefinition.antonyms.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("ANTONYMS")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                            .textCase(.uppercase)
                         
-                        if selectedDefinition.antonyms.count > 4 {
-                            Text("...")
-                                .foregroundColor(.secondary)
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(selectedDefinition.antonyms.prefix(4), id: \.self) { antonym in
+                                Text(antonym.prefix(1).uppercased() + antonym.dropFirst())
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            if selectedDefinition.antonyms.count > 4 {
+                                Text("...")
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
                 }
+                
+                Spacer()
             }
-            
-            Spacer()
         }
     }
     
     private var etymologySection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Divider()
+                .padding(.bottom, 8)
+            
             Text("ETYMOLOGY")
                 .font(.caption)
                 .fontWeight(.bold)
                 .foregroundColor(.primary)
                 .textCase(.uppercase)
             
-            Text(selectedDefinition.morphology)
+            Text(selectedDefinition.morphology.prefix(1).uppercased() + selectedDefinition.morphology.dropFirst())
                 .font(.body)
                 .foregroundColor(.secondary)
         }
@@ -569,6 +677,9 @@ struct EntryDetailView: View {
     
     private var examplesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Divider()
+                .padding(.bottom, 8)
+            
             Text("EXAMPLES")
                 .font(.caption)
                 .fontWeight(.bold)
@@ -578,14 +689,14 @@ struct EntryDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 ForEach(selectedDefinition.examples) { example in
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(example.twi)
+                        Text(example.twi.prefix(1).uppercased() + example.twi.dropFirst())
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        
+                        Text(example.en.prefix(1).uppercased() + example.en.dropFirst())
                             .font(.body)
                             .foregroundColor(.secondary)
                             .italic()
-                        
-                        Text(example.en)
-                            .font(.body)
-                            .foregroundColor(.secondary)
                     }
                 }
             }
@@ -594,6 +705,9 @@ struct EntryDetailView: View {
     
     private var dialectsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Divider()
+                .padding(.bottom, 8)
+            
             Text("DIALECTS")
                 .font(.caption)
                 .fontWeight(.bold)
@@ -616,6 +730,9 @@ struct EntryDetailView: View {
     
     private var tagsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Divider()
+                .padding(.bottom, 8)
+            
             Text("TAGS")
                 .font(.caption)
                 .fontWeight(.bold)
@@ -636,40 +753,40 @@ struct EntryDetailView: View {
         }
     }
     
-    private var frequencySection: some View {
+    private var viewCountSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("FREQUENCY")
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
-                .textCase(.uppercase)
+            Divider()
+                .padding(.bottom, 8)
             
-            HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    ForEach(0..<3) { index in
-                        Circle()
-                            .fill(index < frequencyBars(selectedDefinition.frequency) ? Color.green : Color.gray.opacity(0.2))
-                            .frame(width: 8, height: 8)
-                    }
+            HStack {
+                Spacer()
+                
+                if viewCount > 0 {
+                    Text("\(viewCount.formatted()) views")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Be the first to view")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
-                Text(frequencyLabel(selectedDefinition.frequency))
-                    .font(.body)
-                    .foregroundColor(.secondary)
+                Spacer()
             }
         }
     }
     
-    private func frequencyBars(_ frequency: Int) -> Int {
-        if frequency >= 80 { return 3 }
-        if frequency >= 50 { return 2 }
-        return 1
-    }
-    
-    private func frequencyLabel(_ frequency: Int) -> String {
-        if frequency >= 80 { return "Very Common" }
-        if frequency >= 50 { return "Common" }
-        return "Less Common"
+    private func loadViewCount() {
+        Task {
+            do {
+                let count = try await TrendingService.shared.getViewCount(for: entry.id)
+                await MainActor.run {
+                    viewCount = count
+                }
+            } catch {
+                //not critical
+            }
+        }
     }
 }
 
@@ -734,6 +851,7 @@ struct FlowLayout: Layout {
             dialects: ["Asante", "Akuapem"],
             syllables: "a-bo-a",
             ipa: "abòá",
+            imageUrl: "",
             definitions: [
                 Definition(
                     definitionNumber: 1,
@@ -747,9 +865,9 @@ struct FlowLayout: Layout {
                     synonyms: ["creature", "beast"],
                     antonyms: ["human"],
                     morphology: "Root: aboa",
-                    frequency: 85,
                     tags: ["nature", "wildlife"],
-                    contentWarning: false
+                    imageUrl: "aboa-1.png",
+                    audioUrl: "aboa-1.mp3"
                 )
             ],
             attribution: "manual_import",

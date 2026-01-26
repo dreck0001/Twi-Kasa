@@ -1,7 +1,7 @@
 import Foundation
 
+// all images served from Firebase Storage
 private let imageBaseURL = "https://storage.googleapis.com/twi-kasa-prod.firebasestorage.app/images/"
-private let audioBaseURL = "https://storage.googleapis.com/twi-kasa-prod.firebasestorage.app/audio/"
 
 struct Definition: Codable, Identifiable, Hashable {
     let id = UUID()
@@ -13,11 +13,10 @@ struct Definition: Codable, Identifiable, Hashable {
     let synonyms: [String]
     let antonyms: [String]
     let morphology: String
-    let frequency: Int
     let tags: [String]
+    let imageUrl: String
+    let audioUrl: String
     let contentWarning: Bool
-    let imageExt: String
-    let audioExt: String
     
     enum CodingKeys: String, CodingKey {
         case definitionNumber
@@ -28,11 +27,10 @@ struct Definition: Codable, Identifiable, Hashable {
         case synonyms
         case antonyms
         case morphology
-        case frequency
         case tags
+        case imageUrl
+        case audioUrl
         case contentWarning
-        case imageExt
-        case audioExt
     }
     
     init(
@@ -44,11 +42,10 @@ struct Definition: Codable, Identifiable, Hashable {
         synonyms: [String],
         antonyms: [String],
         morphology: String,
-        frequency: Int,
         tags: [String],
-        contentWarning: Bool = false,
-        imageExt: String = "",
-        audioExt: String = ""
+        imageUrl: String = "",
+        audioUrl: String = "",
+        contentWarning: Bool = false
     ) {
         self.definitionNumber = definitionNumber
         self.partOfSpeech = partOfSpeech
@@ -58,11 +55,10 @@ struct Definition: Codable, Identifiable, Hashable {
         self.synonyms = synonyms
         self.antonyms = antonyms
         self.morphology = morphology
-        self.frequency = frequency
         self.tags = tags
+        self.imageUrl = imageUrl
+        self.audioUrl = audioUrl
         self.contentWarning = contentWarning
-        self.imageExt = imageExt
-        self.audioExt = audioExt
     }
     
     init(from decoder: Decoder) throws {
@@ -75,49 +71,36 @@ struct Definition: Codable, Identifiable, Hashable {
         synonyms = try container.decode([String].self, forKey: .synonyms)
         antonyms = try container.decode([String].self, forKey: .antonyms)
         morphology = try container.decode(String.self, forKey: .morphology)
-        frequency = try container.decode(Int.self, forKey: .frequency)
         tags = try container.decode([String].self, forKey: .tags)
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl) ?? ""
+        audioUrl = try container.decodeIfPresent(String.self, forKey: .audioUrl) ?? ""
         contentWarning = try container.decodeIfPresent(Bool.self, forKey: .contentWarning) ?? false
-        imageExt = try container.decodeIfPresent(String.self, forKey: .imageExt) ?? ""
-        audioExt = try container.decodeIfPresent(String.self, forKey: .audioExt) ?? ""
     }
     
-    func imageFilename(for parentNormalized: String) -> String {
-        guard !imageExt.isEmpty else { return "" }
-        return "\(parentNormalized)-\(definitionNumber).\(imageExt)"
+    var hasImage: Bool {
+        !imageUrl.isEmpty
     }
     
-    func audioFilename(for parentNormalized: String) -> String {
-        guard !audioExt.isEmpty else { return "" }
-        return "\(parentNormalized)-\(definitionNumber).\(audioExt)"
+    var hasAudio: Bool {
+        !audioUrl.isEmpty
     }
     
-    func fullImageUrl(for parentNormalized: String) -> String {
-        let filename = imageFilename(for: parentNormalized)
-        guard !filename.isEmpty else { return "" }
-        return imageBaseURL + filename
+    var fullImageUrl: String {
+        guard !imageUrl.isEmpty else { return "" }
+        return imageBaseURL + imageUrl
     }
     
-    func possibleImageUrls(for parentNormalized: String) -> [String] {
-        if !imageExt.isEmpty {
-            return [fullImageUrl(for: parentNormalized)]
+    func possibleAudioFilenames(for normalized: String) -> [String] {
+        var filenames: [String] = []
+        
+        if !audioUrl.isEmpty {
+            filenames.append(audioUrl)
         }
         
-        // Try common image formats in order of preference
-        return ["jpg", "jpeg", "png"].map { ext in
-            "\(imageBaseURL)\(parentNormalized)-\(definitionNumber).\(ext)"
-        }
-    }
-    
-    func possibleAudioFilenames(for parentNormalized: String) -> [String] {
-        if !audioExt.isEmpty {
-            return [audioFilename(for: parentNormalized)]
-        }
+        filenames.append("\(normalized).mp3")
+        filenames.append("\(normalized).m4a")
         
-        // Try common audio formats
-        return ["mp3", "m4a", "wav"].map { ext in
-            "\(parentNormalized)-\(definitionNumber).\(ext)"
-        }
+        return filenames
     }
     
     static func == (lhs: Definition, rhs: Definition) -> Bool {
@@ -159,13 +142,76 @@ struct Entry: Codable, Identifiable, Hashable {
     let dialects: [String]
     let syllables: String
     let ipa: String
+    let imageUrl: String
     let definitions: [Definition]
     let attribution: String
     let createdAt: String
     let updatedAt: String
     
-    var primaryFrequency: Int {
-        definitions.max(by: { $0.frequency < $1.frequency })?.frequency ?? 50
+    enum CodingKeys: String, CodingKey {
+        case id
+        case headword
+        case normalized
+        case dialects
+        case syllables
+        case ipa
+        case imageUrl
+        case definitions
+        case attribution
+        case createdAt
+        case updatedAt
+    }
+    
+    //memberwise initializer for manual creation like for previews
+    init(
+        id: String,
+        headword: String,
+        normalized: String,
+        dialects: [String],
+        syllables: String,
+        ipa: String,
+        imageUrl: String = "",
+        definitions: [Definition],
+        attribution: String,
+        createdAt: String,
+        updatedAt: String
+    ) {
+        self.id = id
+        self.headword = headword
+        self.normalized = normalized
+        self.dialects = dialects
+        self.syllables = syllables
+        self.ipa = ipa
+        self.imageUrl = imageUrl
+        self.definitions = definitions
+        self.attribution = attribution
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+    
+    //decoder initializer for Firestore
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        headword = try container.decode(String.self, forKey: .headword)
+        normalized = try container.decode(String.self, forKey: .normalized)
+        dialects = try container.decode([String].self, forKey: .dialects)
+        syllables = try container.decode(String.self, forKey: .syllables)
+        ipa = try container.decode(String.self, forKey: .ipa)
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl) ?? ""
+        definitions = try container.decode([Definition].self, forKey: .definitions)
+        attribution = try container.decode(String.self, forKey: .attribution)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    }
+    
+    var hasImage: Bool {
+        !imageUrl.isEmpty
+    }
+    
+    var fullImageUrl: String {
+        guard !imageUrl.isEmpty else { return "" }
+        return imageBaseURL + imageUrl
     }
     
     static func == (lhs: Entry, rhs: Entry) -> Bool {
@@ -182,13 +228,11 @@ struct SearchResult: Identifiable {
     let headword: String
     let primaryDefinition: String
     let partOfSpeech: String
-    let frequency: Int
     
     init(from entry: Entry) {
         self.id = entry.id
         self.headword = entry.headword
         self.primaryDefinition = entry.definitions.first?.enDefinition ?? ""
         self.partOfSpeech = entry.definitions.first?.partOfSpeech ?? ""
-        self.frequency = entry.primaryFrequency
     }
 }

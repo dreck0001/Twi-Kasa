@@ -1,11 +1,3 @@
-//
-//  TrendingService.swift
-//  TwiKasa
-//
-//  Created by Throw Catchers on 1/19/26.
-//
-
-
 import Foundation
 import FirebaseFirestore
 
@@ -22,18 +14,18 @@ class TrendingService: ObservableObject {
     private init() {}
     
     func trackSearch(_ entryId: String) {
-        incrementScore(entryId, points: searchWeight)
+        incrementScore(entryId, points: searchWeight, incrementSearch: true)
     }
     
     func trackView(_ entryId: String) {
-        incrementScore(entryId, points: viewWeight)
+        incrementScore(entryId, points: viewWeight, incrementView: true)
     }
     
     func trackFavorite(_ entryId: String) {
-        incrementScore(entryId, points: favoriteWeight)
+        incrementScore(entryId, points: favoriteWeight, incrementFavorite: true)
     }
     
-    private func incrementScore(_ entryId: String, points: Double) {
+    private func incrementScore(_ entryId: String, points: Double, incrementSearch: Bool = false, incrementView: Bool = false, incrementFavorite: Bool = false) {
         let docRef = db.collection(trendingCollection).document(entryId)
         let today = ISO8601DateFormatter().string(from: Date()).prefix(10)
         let weekStart = getWeekStart()
@@ -48,20 +40,26 @@ class TrendingService: ObservableObject {
             }
             
             let currentScore = document.data()?["score"] as? Double ?? 0
+            let currentSearchCount = document.data()?["searchCount"] as? Int ?? 0
+            let currentViewCount = document.data()?["viewCount"] as? Int ?? 0
+            let currentFavoriteCount = document.data()?["favoriteCount"] as? Int ?? 0
+            
             let newScore = currentScore + points
+            let newSearchCount = currentSearchCount + (incrementSearch ? 1 : 0)
+            let newViewCount = currentViewCount + (incrementView ? 1 : 0)
+            let newFavoriteCount = currentFavoriteCount + (incrementFavorite ? 1 : 0)
             
             transaction.setData([
                 "score": newScore,
+                "searchCount": newSearchCount,
+                "viewCount": newViewCount,
+                "favoriteCount": newFavoriteCount,
                 "lastUpdated": String(today),
                 "weekStart": weekStart
             ], forDocument: docRef, merge: true)
             
             return nil
-        }) { (object, error) in
-            if let error = error {
-                print("Trending update failed: \(error)")
-            }
-        }
+        }) { _, _ in }
     }
     
     private func getWeekStart() -> String {
@@ -98,5 +96,10 @@ class TrendingService: ObservableObject {
         }
         
         return entries
+    }
+    
+    func getViewCount(for entryId: String) async throws -> Int {
+        let document = try await db.collection(trendingCollection).document(entryId).getDocument()
+        return document.data()?["viewCount"] as? Int ?? 0
     }
 }

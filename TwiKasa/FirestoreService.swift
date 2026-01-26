@@ -10,24 +10,20 @@ class FirestoreService: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
-    private static var hasConfiguredSettings = false
+    init() {}
     
-    init() {
-        // only configure once
-        if !FirestoreService.hasConfiguredSettings {
-            let settings = FirestoreSettings()
-            settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: FirestoreCacheSizeUnlimited))
-            db.settings = settings
-            FirestoreService.hasConfiguredSettings = true
-        }
+    private func normalize(_ text: String) -> String {
+        return text
+            .lowercased()
+            .folding(options: .diacriticInsensitive, locale: .current)
+            .replacingOccurrences(of: "ɔ", with: "o")
+            .replacingOccurrences(of: "ɛ", with: "e")
     }
     
     func searchWords(query: String) async throws -> [Entry] {
-        guard !query.isEmpty else {
-            return []
-        }
+        guard !query.isEmpty else { return [] }
         
-        let normalizedQuery = query.lowercased()
+        let normalizedQuery = normalize(query)
         
         let snapshot = try await db.collection(entriesCollection)
             .whereField("normalized", isGreaterThanOrEqualTo: normalizedQuery)
@@ -39,12 +35,7 @@ class FirestoreService: ObservableObject {
             try? doc.data(as: Entry.self)
         }
         
-        return results.sorted { entry1, entry2 in
-            if entry1.primaryFrequency == entry2.primaryFrequency {
-                return entry1.headword < entry2.headword
-            }
-            return entry1.primaryFrequency > entry2.primaryFrequency
-        }
+        return results.sorted { $0.headword < $1.headword }
     }
     
     func getEntry(id: String) async throws -> Entry? {
@@ -61,13 +52,11 @@ class FirestoreService: ObservableObject {
             .limit(to: limit)
             .getDocuments()
         
-        var results = snapshot.documents.compactMap { doc -> Entry? in
+        let results = snapshot.documents.compactMap { doc -> Entry? in
             try? doc.data(as: Entry.self)
         }
         
-        results.sort { $0.primaryFrequency > $1.primaryFrequency }
-        
-        return Array(results.prefix(limit))
+        return results.sorted { $0.headword < $1.headword }
     }
     
     func getRandomWords(count: Int = 5) async throws -> [Entry] {

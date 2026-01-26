@@ -3,6 +3,8 @@ import SwiftUI
 class ImageCache {
     static let shared = ImageCache()
     
+    var disableCaching = false
+    
     private let cache = NSCache<NSString, UIImage>()
     private let fileManager = FileManager.default
     private lazy var cacheDirectory: URL = {
@@ -18,10 +20,12 @@ class ImageCache {
     
     private init() {
         cache.countLimit = 100
-        cache.totalCostLimit = 100 * 1024 * 1024  // 100 MB
+        cache.totalCostLimit = 100 * 1024 * 1024
     }
     
     func get(url: String) -> UIImage? {
+        if disableCaching { return nil }
+        
         let key = NSString(string: url)
         
         if let image = cache.object(forKey: key) {
@@ -37,8 +41,9 @@ class ImageCache {
     }
     
     func set(url: String, image: UIImage) {
-        let key = NSString(string: url)
+        if disableCaching { return }
         
+        let key = NSString(string: url)
         cache.setObject(image, forKey: key)
         saveToDisk(url: url, image: image)
     }
