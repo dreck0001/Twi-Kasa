@@ -13,6 +13,7 @@ struct EntryDetailView: View {
     @State private var showContentWarningTooltip = false
     @State private var shareImage: UIImage?
     @State private var showShareSheet = false
+    @State private var showReportSheet = false
     @State private var viewCount: Int = 0
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var favoritesManager = FavoritesManager.shared
@@ -156,7 +157,7 @@ struct EntryDetailView: View {
                                 
                                 Menu {
                                     Button {
-                                        // not implemented yet
+                                        showReportSheet = true
                                     } label: {
                                         Label("Report Issue", systemImage: "exclamationmark.bubble")
                                     }
@@ -259,6 +260,9 @@ struct EntryDetailView: View {
             } else {
                 ShareViewController(activityItems: [shareText])
             }
+        }
+        .sheet(isPresented: $showReportSheet) {
+            ReportView(entryId: entry.id, headword: entry.headword)
         }
     }
     
@@ -837,8 +841,7 @@ struct EntryDetailView: View {
                 await MainActor.run {
                     viewCount = count
                 }
-            } catch {
-            }
+            } catch { }
         }
     }
 }

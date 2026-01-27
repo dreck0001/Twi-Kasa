@@ -20,6 +20,7 @@ struct SearchView: View {
     @State private var isLoadingTrending = false
     @State private var lastTrendingRefresh: Date?
     @State private var navigationPath = NavigationPath()
+    @State private var showReportSheet = false
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -198,9 +199,21 @@ struct SearchView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+            
+            Button {
+                showReportSheet = true
+            } label: {
+                Text("Request this word")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+        .sheet(isPresented: $showReportSheet) {
+            ReportView(searchQuery: searchText)
+        }
     }
     
     private func performSearch(query: String) async {
