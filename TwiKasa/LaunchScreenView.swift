@@ -1,10 +1,14 @@
 import SwiftUI
 
 struct LaunchScreenView: View {
+    @State private var showKasa = false
+    @State private var kasaOffset: CGFloat = -60
+    @State private var kasaOpacity: Double = 0
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Image("icon background")
+                Image("porcupine")
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: geometry.size.width, height: geometry.size.height)
@@ -29,9 +33,17 @@ struct LaunchScreenView: View {
                 }
                 
                 VStack(spacing: 12) {
-                    Text("Twi Kasa")
-                        .font(.system(size: 52, weight: .bold))
-                        .foregroundColor(.white)
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        Text("Twi")
+                            .font(.system(size: 52, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text(" Kasa")
+                            .font(.system(size: 52, weight: .bold))
+                            .foregroundColor(.white)
+                            .offset(x: kasaOffset)
+                            .opacity(kasaOpacity)
+                    }
                     
                     HStack(spacing: 6) {
                         Text("/ʧwi kasa/")
@@ -46,10 +58,18 @@ struct LaunchScreenView: View {
                     .padding(.vertical, 8)
                     .background(Color.white.opacity(0.15))
                     .cornerRadius(8)
+                    .opacity(kasaOpacity)
                 }
             }
         }
         .ignoresSafeArea()
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.6).delay(0.3)) {
+                showKasa = true
+                kasaOffset = 0
+                kasaOpacity = 1
+            }
+        }
     }
 }
 
