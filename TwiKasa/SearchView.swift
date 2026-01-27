@@ -11,13 +11,15 @@ struct SearchView: View {
     @StateObject private var firestoreService = FirestoreService()
     @EnvironmentObject private var deepLinkManager: DeepLinkManager
     @State private var searchText = ""
-    @State private var searchResults: [Entry] = []
+    @State private var searchResults: [Word] = []
     @State private var isSearching = false
-    @State private var selectedEntry: Entry?
+    @State private var selectedWord: Word?
     @State private var searchTask: Task<Void, Never>?
-    @State private var trendingWords: [Entry] = []
-    @State private var recentSearches: [Entry] = []
+    @State private var trendingWords: [Word] = []
+    @State private var recentSearches: [Word] = []
+    @State private var newWords: [Word] = []
     @State private var isLoadingTrending = false
+    @State private var isLoadingNewWords = false
     @State private var lastTrendingRefresh: Date?
     @State private var navigationPath = NavigationPath()
     @State private var showReportSheet = false
@@ -39,10 +41,10 @@ struct SearchView: View {
             }
             .navigationTitle("Dictionary")
             .navigationBarTitleDisplayMode(.large)
-            .navigationDestination(for: Entry.self) { entry in
-                EntryDetailView(entry: entry)
+            .navigationDestination(for: Word.self) { word in
+                WordDetailView(word: word)
                     .onAppear {
-                        saveRecentSearch(entry)
+                        saveRecentSearch(word)
                     }
             }
             .task {
@@ -55,15 +57,19 @@ struct SearchView: View {
                     loadTrendingWords()
                 }
                 
+                if newWords.isEmpty {
+                    loadNewWords()
+                }
+                
                 loadRecentSearches()
             }
-            .onChange(of: deepLinkManager.pendingEntryId) { _, entryId in
-                guard let entryId = entryId else { return }
-                handleDeepLink(entryId: entryId)
+            .onChange(of: deepLinkManager.pendingWordId) { _, wordId in
+                guard let wordId = wordId else { return }
+                handleDeepLink(wordId: wordId)
             }
             .onAppear {
-                if let entryId = deepLinkManager.pendingEntryId {
-                    handleDeepLink(entryId: entryId)
+                if let wordId = deepLinkManager.pendingWordId {
+                    handleDeepLink(wordId: wordId)
                 }
             }
         }
@@ -111,9 +117,9 @@ struct SearchView: View {
     private var resultsList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(searchResults) { entry in
-                    NavigationLink(value: entry) {
-                        HorizontalWordCard(entry: entry)
+                ForEach(searchResults) { word in
+                    NavigationLink(value: word) {
+                        HorizontalWordCard(word: word)
                     }
                     .buttonStyle(.plain)
                 }
@@ -144,9 +150,9 @@ struct SearchView: View {
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
-                                ForEach(recentSearches) { entry in
-                                    NavigationLink(value: entry) {
-                                        WordCard(entry: entry)
+                                ForEach(recentSearches) { word in
+                                    NavigationLink(value: word) {
+                                        WordCard(word: word)
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -171,9 +177,36 @@ struct SearchView: View {
                     } else {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
-                                ForEach(trendingWords) { entry in
-                                    NavigationLink(value: entry) {
-                                        WordCard(entry: entry)
+                                ForEach(trendingWords) { word in
+                                    NavigationLink(value: word) {
+                                        WordCard(word: word)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("New Words")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    
+                    if isLoadingNewWords {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                    } else if newWords.isEmpty {
+                        Text("No new words yet")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(newWords) { word in
+                                    NavigationLink(value: word) {
+                                        WordCard(word: word)
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -244,11 +277,11 @@ struct SearchView: View {
         }
     }
     
-    private func handleDeepLink(entryId: String) {
+    private func handleDeepLink(wordId: String) {
         Task {
-            if let entry = try? await firestoreService.getEntry(id: entryId) {
+            if let word = try? await firestoreService.getWord(id: wordId) {
                 await MainActor.run {
-                    navigationPath.append(entry)
+                    navigationPath.append(word)
                     deepLinkManager.clearPending()
                 }
             } else {
@@ -277,17 +310,34 @@ struct SearchView: View {
         }
     }
     
+    private func loadNewWords() {
+        isLoadingNewWords = true
+        Task {
+            do {
+                let words = try await firestoreService.getNewWords(limit: 10)
+                await MainActor.run {
+                    newWords = words
+                    isLoadingNewWords = false
+                }
+            } catch {
+                await MainActor.run {
+                    isLoadingNewWords = false
+                }
+            }
+        }
+    }
+    
     private func loadRecentSearches() {
         if let data = UserDefaults.standard.data(forKey: "recentSearches"),
-           let decoded = try? JSONDecoder().decode([Entry].self, from: data) {
+           let decoded = try? JSONDecoder().decode([Word].self, from: data) {
             recentSearches = Array(decoded.prefix(5))
         }
     }
     
-    private func saveRecentSearch(_ entry: Entry) {
+    private func saveRecentSearch(_ word: Word) {
         var recents = recentSearches
-        recents.removeAll { $0.id == entry.id }
-        recents.insert(entry, at: 0)
+        recents.removeAll { $0.id == word.id }
+        recents.insert(word, at: 0)
         recents = Array(recents.prefix(5))
         
         if let encoded = try? JSONEncoder().encode(recents) {
@@ -299,11 +349,11 @@ struct SearchView: View {
 }
 
 struct HorizontalWordCard: View {
-    let entry: Entry
+    let word: Word
     
     private var uniquePartsOfSpeech: [String] {
         var seen = Set<String>()
-        return entry.definitions.compactMap { def in
+        return word.definitions.compactMap { def in
             let pos = def.partOfSpeech
             if seen.contains(pos) { return nil }
             seen.insert(pos)
@@ -314,18 +364,18 @@ struct HorizontalWordCard: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(entry.headword)
+                Text(word.headword)
                     .font(.title3)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
                 
-                if !entry.ipa.isEmpty {
-                    Text("[\(entry.ipa)]")
+                if !word.ipa.isEmpty {
+                    Text("[\(word.ipa)]")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 
-                if let firstDef = entry.definitions.first {
+                if let firstDef = word.definitions.first {
                     Text(firstDef.enDefinition)
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -360,11 +410,11 @@ struct HorizontalWordCard: View {
 }
 
 struct WordCard: View {
-    let entry: Entry
+    let word: Word
     
     private var uniquePartsOfSpeech: [String] {
         var seen = Set<String>()
-        return entry.definitions.compactMap { def in
+        return word.definitions.compactMap { def in
             let pos = def.partOfSpeech
             if seen.contains(pos) { return nil }
             seen.insert(pos)
@@ -374,20 +424,20 @@ struct WordCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(entry.headword)
+            Text(word.headword)
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
                 .lineLimit(1)
             
-            if !entry.ipa.isEmpty {
-                Text("[\(entry.ipa)]")
+            if !word.ipa.isEmpty {
+                Text("[\(word.ipa)]")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
             
-            if let firstDef = entry.definitions.first {
+            if let firstDef = word.definitions.first {
                 Text(firstDef.enDefinition)
                     .font(.caption)
                     .foregroundColor(.secondary)

@@ -3,7 +3,7 @@ import SwiftUI
 struct FavoritesView: View {
     @StateObject private var firestoreService = FirestoreService()
     @ObservedObject private var favoritesManager = FavoritesManager.shared
-    @State private var favoriteEntries: [Entry] = []
+    @State private var favoriteWords: [Word] = []
     @State private var isLoading = false
     
     var body: some View {
@@ -11,7 +11,7 @@ struct FavoritesView: View {
             Group {
                 if isLoading {
                     loadingView
-                } else if favoriteEntries.isEmpty {
+                } else if favoriteWords.isEmpty {
                     emptyStateView
                 } else {
                     favoritesList
@@ -59,14 +59,14 @@ struct FavoritesView: View {
     private var favoritesList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(favoriteEntries) { entry in
-                    NavigationLink(value: entry) {
-                        HorizontalWordCard(entry: entry)
+                ForEach(favoriteWords) { word in
+                    NavigationLink(value: word) {
+                        HorizontalWordCard(word: word)
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
                         Button(role: .destructive) {
-                            removeFavoriteFromList(entry)
+                            removeFavoriteFromList(word)
                         } label: {
                             Label("Remove from Favorites", systemImage: "star.slash")
                         }
@@ -75,15 +75,15 @@ struct FavoritesView: View {
             }
             .padding()
         }
-        .navigationDestination(for: Entry.self) { entry in
-            EntryDetailView(entry: entry)
+        .navigationDestination(for: Word.self) { word in
+            WordDetailView(word: word)
         }
     }
     
     private func loadFavorites() async {
         if favoritesManager.favoriteIds.isEmpty {
             await MainActor.run {
-                favoriteEntries = []
+                favoriteWords = []
                 isLoading = false
             }
             return
@@ -94,31 +94,31 @@ struct FavoritesView: View {
         }
         
         do {
-            var entries: [Entry] = []
+            var words: [Word] = []
             
-            for entryId in favoritesManager.getAllFavoriteIds() {
-                if let entry = try await firestoreService.getEntry(id: entryId) {
-                    entries.append(entry)
+            for wordId in favoritesManager.getAllFavoriteIds() {
+                if let word = try await firestoreService.getWord(id: wordId) {
+                    words.append(word)
                 }
             }
             
             await MainActor.run {
-                favoriteEntries = entries.sorted { $0.headword < $1.headword }
+                favoriteWords = words.sorted { $0.headword < $1.headword }
                 isLoading = false
             }
         } catch {
             await MainActor.run {
-                favoriteEntries = []
+                favoriteWords = []
                 isLoading = false
             }
         }
     }
     
-    private func removeFavoriteFromList(_ entry: Entry) {
-        favoriteEntries.removeAll { $0.id == entry.id }
-        favoritesManager.removeFavorite(entry.id)
+    private func removeFavoriteFromList(_ word: Word) {
+        favoriteWords.removeAll { $0.id == word.id }
+        favoritesManager.removeFavorite(word.id)
         
-        if favoriteEntries.isEmpty {
+        if favoriteWords.isEmpty {
             Task {
                 await loadFavorites()
             }

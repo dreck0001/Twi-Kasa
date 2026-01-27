@@ -1,11 +1,3 @@
-//
-//  AdminService.swift
-//  TwiKasa
-//
-//  Created by Throw Catchers on 1/26/26.
-//
-
-
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
@@ -88,7 +80,7 @@ struct ReportItem: Identifiable {
     
     var contextEmoji: String {
         switch context {
-        case "entry": return "📖"
+        case "word": return "📖"
         case "search": return "🔍"
         default: return "💬"
         }

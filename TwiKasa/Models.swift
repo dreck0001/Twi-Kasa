@@ -135,7 +135,7 @@ struct Example: Codable, Identifiable, Hashable {
     }
 }
 
-struct Entry: Codable, Identifiable, Hashable {
+struct Word: Codable, Identifiable, Hashable {
     let id: String
     let headword: String
     let normalized: String
@@ -162,7 +162,6 @@ struct Entry: Codable, Identifiable, Hashable {
         case updatedAt
     }
     
-    //memberwise initializer for manual creation like for previews
     init(
         id: String,
         headword: String,
@@ -189,7 +188,6 @@ struct Entry: Codable, Identifiable, Hashable {
         self.updatedAt = updatedAt
     }
     
-    //decoder initializer for Firestore
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
@@ -214,7 +212,7 @@ struct Entry: Codable, Identifiable, Hashable {
         return imageBaseURL + imageUrl
     }
     
-    static func == (lhs: Entry, rhs: Entry) -> Bool {
+    static func == (lhs: Word, rhs: Word) -> Bool {
         lhs.id == rhs.id
     }
     
@@ -229,10 +227,10 @@ struct SearchResult: Identifiable {
     let primaryDefinition: String
     let partOfSpeech: String
     
-    init(from entry: Entry) {
-        self.id = entry.id
-        self.headword = entry.headword
-        self.primaryDefinition = entry.definitions.first?.enDefinition ?? ""
-        self.partOfSpeech = entry.definitions.first?.partOfSpeech ?? ""
+    init(from word: Word) {
+        self.id = word.id
+        self.headword = word.headword
+        self.primaryDefinition = word.definitions.first?.enDefinition ?? ""
+        self.partOfSpeech = word.definitions.first?.partOfSpeech ?? ""
     }
 }

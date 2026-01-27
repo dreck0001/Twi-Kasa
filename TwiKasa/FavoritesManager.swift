@@ -25,26 +25,26 @@ class FavoritesManager: ObservableObject {
         }
     }
     
-    func toggleFavorite(_ entryId: String) {
-        if favoriteIds.contains(entryId) {
-            favoriteIds.remove(entryId)
+    func toggleFavorite(_ wordId: String) {
+        if favoriteIds.contains(wordId) {
+            favoriteIds.remove(wordId)
         } else {
-            favoriteIds.insert(entryId)
-            TrendingService.shared.trackFavorite(entryId)
+            favoriteIds.insert(wordId)
+            TrendingService.shared.trackFavorite(wordId)
         }
         saveFavorites()
     }
     
-    func isFavorited(_ entryId: String) -> Bool {
-        favoriteIds.contains(entryId)
+    func isFavorited(_ wordId: String) -> Bool {
+        favoriteIds.contains(wordId)
     }
     
     func getAllFavoriteIds() -> [String] {
         Array(favoriteIds)
     }
     
-    func removeFavorite(_ entryId: String) {
-        favoriteIds.remove(entryId)
+    func removeFavorite(_ wordId: String) {
+        favoriteIds.remove(wordId)
         saveFavorites()
     }
     

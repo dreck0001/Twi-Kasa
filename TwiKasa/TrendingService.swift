@@ -13,20 +13,20 @@ class TrendingService: ObservableObject {
     
     private init() {}
     
-    func trackSearch(_ entryId: String) {
-        incrementScore(entryId, points: searchWeight, incrementSearch: true)
+    func trackSearch(_ wordId: String) {
+        incrementScore(wordId, points: searchWeight, incrementSearch: true)
     }
     
-    func trackView(_ entryId: String) {
-        incrementScore(entryId, points: viewWeight, incrementView: true)
+    func trackView(_ wordId: String) {
+        incrementScore(wordId, points: viewWeight, incrementView: true)
     }
     
-    func trackFavorite(_ entryId: String) {
-        incrementScore(entryId, points: favoriteWeight, incrementFavorite: true)
+    func trackFavorite(_ wordId: String) {
+        incrementScore(wordId, points: favoriteWeight, incrementFavorite: true)
     }
     
-    private func incrementScore(_ entryId: String, points: Double, incrementSearch: Bool = false, incrementView: Bool = false, incrementFavorite: Bool = false) {
-        let docRef = db.collection(trendingCollection).document(entryId)
+    private func incrementScore(_ wordId: String, points: Double, incrementSearch: Bool = false, incrementView: Bool = false, incrementFavorite: Bool = false) {
+        let docRef = db.collection(trendingCollection).document(wordId)
         let today = ISO8601DateFormatter().string(from: Date()).prefix(10)
         let weekStart = getWeekStart()
         
@@ -76,30 +76,30 @@ class TrendingService: ObservableObject {
         return ISO8601DateFormatter().string(from: weekStart).prefix(10).description
     }
     
-    func getTrendingWords(limit: Int = 10) async throws -> [Entry] {
+    func getTrendingWords(limit: Int = 10) async throws -> [Word] {
         let snapshot = try await db.collection(trendingCollection)
             .order(by: "score", descending: true)
             .limit(to: limit)
             .getDocuments()
         
-        var entryIds: [String] = []
+        var wordIds: [String] = []
         for doc in snapshot.documents {
-            entryIds.append(doc.documentID)
+            wordIds.append(doc.documentID)
         }
         
-        var entries: [Entry] = []
-        for entryId in entryIds {
-            let entryDoc = try await db.collection("entries").document(entryId).getDocument()
-            if let entry = try? entryDoc.data(as: Entry.self) {
-                entries.append(entry)
+        var words: [Word] = []
+        for wordId in wordIds {
+            let wordDoc = try await db.collection("words").document(wordId).getDocument()
+            if let word = try? wordDoc.data(as: Word.self) {
+                words.append(word)
             }
         }
         
-        return entries
+        return words
     }
     
-    func getViewCount(for entryId: String) async throws -> Int {
-        let document = try await db.collection(trendingCollection).document(entryId).getDocument()
+    func getViewCount(for wordId: String) async throws -> Int {
+        let document = try await db.collection(trendingCollection).document(wordId).getDocument()
         return document.data()?["viewCount"] as? Int ?? 0
     }
 }

@@ -1,11 +1,3 @@
-//
-//  ReportView.swift
-//  TwiKasa
-//
-//  Created by Throw Catchers on 1/26/26.
-//
-
-
 import SwiftUI
 
 struct ReportView: View {
@@ -20,9 +12,9 @@ struct ReportView: View {
     @State private var showSuccess = false
     @State private var showError = false
     
-    init(entryId: String, headword: String) {
-        self.context = .entry
-        self.contextId = entryId
+    init(wordId: String, headword: String) {
+        self.context = .word
+        self.contextId = wordId
         self.contextLabel = headword
     }
     
@@ -115,7 +107,7 @@ struct ReportView: View {
     
     private var contextTitle: String {
         switch context {
-        case .entry: return "Word"
+        case .word: return "Word"
         case .search: return "Search"
         case .general: return "Topic"
         }
@@ -149,8 +141,8 @@ struct ReportView: View {
     }
 }
 
-#Preview("Entry Report") {
-    ReportView(entryId: "odo", headword: "ɔdɔ")
+#Preview("Word Report") {
+    ReportView(wordId: "odo", headword: "ɔdɔ")
 }
 
 #Preview("Search Report") {

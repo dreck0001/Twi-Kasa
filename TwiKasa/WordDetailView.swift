@@ -1,8 +1,8 @@
 import SwiftUI
 import AVFoundation
 
-struct EntryDetailView: View {
-    let entry: Entry
+struct WordDetailView: View {
+    let word: Word
     
     @StateObject private var audioPlayer = AudioPlayer()
     @State private var selectedDefinitionIndex = 0
@@ -113,7 +113,7 @@ struct EntryDetailView: View {
                             
                             Spacer()
                             
-                            Text(entry.headword)
+                            Text(word.headword)
                                 .font(.headline)
                                 .foregroundColor(.primary)
                                 .padding(.horizontal, 12)
@@ -128,12 +128,12 @@ struct EntryDetailView: View {
                             
                             HStack(spacing: 12) {
                                 Button {
-                                    favoritesManager.toggleFavorite(entry.id)
+                                    favoritesManager.toggleFavorite(word.id)
                                 } label: {
-                                    Image(systemName: favoritesManager.isFavorited(entry.id) ? "star.fill" : "star")
+                                    Image(systemName: favoritesManager.isFavorited(word.id) ? "star.fill" : "star")
                                         .font(.title3)
                                         .fontWeight(.semibold)
-                                        .foregroundColor(favoritesManager.isFavorited(entry.id) ? .yellow : .primary)
+                                        .foregroundColor(favoritesManager.isFavorited(word.id) ? .yellow : .primary)
                                         .frame(width: 32, height: 32)
                                         .background(
                                             Circle()
@@ -169,7 +169,7 @@ struct EntryDetailView: View {
                                     }
                                     
                                     Button {
-                                        UIPasteboard.general.string = entry.headword
+                                        UIPasteboard.general.string = word.headword
                                     } label: {
                                         Label("Copy Word", systemImage: "doc.on.doc")
                                     }
@@ -204,7 +204,7 @@ struct EntryDetailView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            TrendingService.shared.trackView(entry.id)
+            TrendingService.shared.trackView(word.id)
             generateShareCard()
             loadViewCount()
         }
@@ -262,7 +262,7 @@ struct EntryDetailView: View {
             }
         }
         .sheet(isPresented: $showReportSheet) {
-            ReportView(entryId: entry.id, headword: entry.headword)
+            ReportView(wordId: word.id, headword: word.headword)
         }
     }
     
@@ -282,8 +282,8 @@ struct EntryDetailView: View {
         if selectedDefinition.hasImage {
             return [URL(string: selectedDefinition.fullImageUrl)].compactMap { $0 }
         }
-        if !entry.imageUrl.isEmpty {
-            return [URL(string: entry.fullImageUrl)].compactMap { $0 }
+        if !word.imageUrl.isEmpty {
+            return [URL(string: word.fullImageUrl)].compactMap { $0 }
         }
         return []
     }
@@ -299,12 +299,12 @@ struct EntryDetailView: View {
     }
     
     private var selectedDefinition: Definition {
-        entry.definitions[selectedDefinitionIndex]
+        word.definitions[selectedDefinitionIndex]
     }
     
     private var shareText: String {
-        let word = entry.headword
-        let ipa = entry.ipa.isEmpty ? "" : " /\(entry.ipa)/"
+        let headword = word.headword
+        let ipa = word.ipa.isEmpty ? "" : " /\(word.ipa)/"
         let pos = selectedDefinition.partOfSpeech
         let definition = selectedDefinition.enDefinition
         
@@ -312,7 +312,7 @@ struct EntryDetailView: View {
         let appStoreLink = "https://apps.apple.com/app/twikasa/id123456789"
         
         return """
-        \(word)\(ipa) (\(pos))
+        \(headword)\(ipa) (\(pos))
         
         \(definition)
         
@@ -357,8 +357,8 @@ struct EntryDetailView: View {
             
             await MainActor.run {
                 let card = ShareCardView(
-                    headword: entry.headword,
-                    ipa: entry.ipa,
+                    headword: word.headword,
+                    ipa: word.ipa,
                     partOfSpeech: selectedDefinition.partOfSpeech,
                     twiDefinition: selectedDefinition.twiDefinition,
                     enDefinition: selectedDefinition.enDefinition,
@@ -370,7 +370,7 @@ struct EntryDetailView: View {
     }
     
     private var audioFileExists: Bool {
-        let possibleFilenames = selectedDefinition.possibleAudioFilenames(for: entry.normalized)
+        let possibleFilenames = selectedDefinition.possibleAudioFilenames(for: word.normalized)
         for filename in possibleFilenames {
             let components = filename.split(separator: ".")
             guard components.count == 2 else { continue }
@@ -472,19 +472,19 @@ struct EntryDetailView: View {
                                 
                                 HStack(alignment: .bottom) {
                                     VStack(alignment: .leading, spacing: 8) {
-                                        Text(entry.headword)
+                                        Text(word.headword)
                                             .font(.system(size: 48, weight: .bold))
                                             .foregroundColor(.white)
                                         
-                                        if !entry.ipa.isEmpty || audioFileExists {
+                                        if !word.ipa.isEmpty || audioFileExists {
                                             Button {
                                                 if audioFileExists {
-                                                    audioPlayer.play(filenames: selectedDefinition.possibleAudioFilenames(for: entry.normalized))
+                                                    audioPlayer.play(filenames: selectedDefinition.possibleAudioFilenames(for: word.normalized))
                                                 }
                                             } label: {
                                                 HStack(spacing: 6) {
-                                                    if !entry.ipa.isEmpty {
-                                                        Text("/\(entry.ipa)/")
+                                                    if !word.ipa.isEmpty {
+                                                        Text("/\(word.ipa)/")
                                                             .font(.title3)
                                                             .foregroundColor(.white)
                                                     }
@@ -541,19 +541,19 @@ struct EntryDetailView: View {
             
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(entry.headword)
+                    Text(word.headword)
                         .font(.system(size: 48, weight: .bold))
                         .foregroundColor(.white)
                     
-                    if !entry.ipa.isEmpty || audioFileExists {
+                    if !word.ipa.isEmpty || audioFileExists {
                         Button {
                             if audioFileExists {
-                                audioPlayer.play(filenames: selectedDefinition.possibleAudioFilenames(for: entry.normalized))
+                                audioPlayer.play(filenames: selectedDefinition.possibleAudioFilenames(for: word.normalized))
                             }
                         } label: {
                             HStack(spacing: 6) {
-                                if !entry.ipa.isEmpty {
-                                    Text("/\(entry.ipa)/")
+                                if !word.ipa.isEmpty {
+                                    Text("/\(word.ipa)/")
                                         .font(.title3)
                                         .foregroundColor(.white)
                                 }
@@ -588,7 +588,7 @@ struct EntryDetailView: View {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(Array(entry.definitions.enumerated()), id: \.offset) { index, definition in
+                    ForEach(Array(word.definitions.enumerated()), id: \.offset) { index, definition in
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectedDefinitionIndex = index
@@ -773,7 +773,7 @@ struct EntryDetailView: View {
                 .textCase(.uppercase)
             
             HStack(spacing: 8) {
-                ForEach(entry.dialects, id: \.self) { dialect in
+                ForEach(word.dialects, id: \.self) { dialect in
                     Text(dialect)
                         .font(.caption)
                         .padding(.horizontal, 10)
@@ -837,11 +837,13 @@ struct EntryDetailView: View {
     private func loadViewCount() {
         Task {
             do {
-                let count = try await TrendingService.shared.getViewCount(for: entry.id)
+                let count = try await TrendingService.shared.getViewCount(for: word.id)
                 await MainActor.run {
                     viewCount = count
                 }
-            } catch { }
+            } catch {
+                // eh, not a big deal if this fails
+            }
         }
     }
 }
@@ -900,7 +902,7 @@ struct FlowLayout: Layout {
 
 #Preview {
     NavigationStack {
-        EntryDetailView(entry: Entry(
+        WordDetailView(word: Word(
             id: "aboa",
             headword: "aboa",
             normalized: "aboa",

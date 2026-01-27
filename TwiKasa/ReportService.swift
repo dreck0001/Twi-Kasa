@@ -1,11 +1,3 @@
-//
-//  ReportService.swift
-//  TwiKasa
-//
-//  Created by Throw Catchers on 1/26/26.
-//
-
-
 import Foundation
 import FirebaseFirestore
 
@@ -39,7 +31,7 @@ struct Report {
     let description: String
     
     enum ReportContext: String {
-        case entry = "entry"
+        case word = "word"
         case search = "search"
         case general = "general"
     }

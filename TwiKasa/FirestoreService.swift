@@ -4,9 +4,9 @@ import FirebaseFirestore
 class FirestoreService: ObservableObject {
     
     private let db = Firestore.firestore()
-    private let entriesCollection = "entries"
+    private let wordsCollection = "words"
     
-    @Published var entries: [Entry] = []
+    @Published var words: [Word] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -20,59 +20,68 @@ class FirestoreService: ObservableObject {
             .replacingOccurrences(of: "ɛ", with: "e")
     }
     
-    func searchWords(query: String) async throws -> [Entry] {
+    func searchWords(query: String) async throws -> [Word] {
         guard !query.isEmpty else { return [] }
         
         let normalizedQuery = normalize(query)
         
-        let snapshot = try await db.collection(entriesCollection)
+        let snapshot = try await db.collection(wordsCollection)
             .whereField("normalized", isGreaterThanOrEqualTo: normalizedQuery)
             .whereField("normalized", isLessThan: normalizedQuery + "\u{f8ff}")
             .limit(to: 50)
             .getDocuments()
         
-        let results = snapshot.documents.compactMap { doc -> Entry? in
-            try? doc.data(as: Entry.self)
+        let results = snapshot.documents.compactMap { doc -> Word? in
+            try? doc.data(as: Word.self)
         }
         
         return results.sorted { $0.headword < $1.headword }
     }
     
-    func getEntry(id: String) async throws -> Entry? {
-        let document = try await db.collection(entriesCollection)
+    func getWord(id: String) async throws -> Word? {
+        let document = try await db.collection(wordsCollection)
             .document(id)
             .getDocument()
         
-        return try? document.data(as: Entry.self)
+        return try? document.data(as: Word.self)
     }
     
-    func getCommonWords(limit: Int = 20) async throws -> [Entry] {
-        let snapshot = try await db.collection(entriesCollection)
+    func getCommonWords(limit: Int = 20) async throws -> [Word] {
+        let snapshot = try await db.collection(wordsCollection)
             .order(by: "definitions", descending: false)
             .limit(to: limit)
             .getDocuments()
         
-        let results = snapshot.documents.compactMap { doc -> Entry? in
-            try? doc.data(as: Entry.self)
+        let results = snapshot.documents.compactMap { doc -> Word? in
+            try? doc.data(as: Word.self)
         }
         
         return results.sorted { $0.headword < $1.headword }
     }
     
-    func getRandomWords(count: Int = 5) async throws -> [Entry] {
-        let snapshot = try await db.collection(entriesCollection)
+    func getRandomWords(count: Int = 5) async throws -> [Word] {
+        let snapshot = try await db.collection(wordsCollection)
             .limit(to: 50)
             .getDocuments()
         
-        let allEntries = snapshot.documents.compactMap { doc -> Entry? in
-            try? doc.data(as: Entry.self)
+        let allWords = snapshot.documents.compactMap { doc -> Word? in
+            try? doc.data(as: Word.self)
         }
         
-        return Array(allEntries.shuffled().prefix(count))
+        return Array(allWords.shuffled().prefix(count))
+    }
+    
+    func getNewWords(limit: Int = 10) async throws -> [Word] {
+        let snapshot = try await db.collection(wordsCollection)
+            .order(by: "createdAt", descending: true)
+            .limit(to: limit)
+            .getDocuments()
+        
+        return snapshot.documents.compactMap { try? $0.data(as: Word.self) }
     }
     
     var hasCachedData: Bool {
-        !entries.isEmpty
+        !words.isEmpty
     }
 }
 
