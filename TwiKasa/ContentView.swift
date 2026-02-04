@@ -25,9 +25,9 @@ struct ContentView: View {
                     Label("Learn", systemImage: "graduationcap.fill")
                 }
             
-            SettingsView()
+            ProfileView()
                 .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
+                    Label("Profile", systemImage: "person.circle.fill")
                 }
         }
         .tint(.red.opacity(0.8))

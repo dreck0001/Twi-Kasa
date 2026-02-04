@@ -10,10 +10,8 @@ struct TwiKasaApp: App {
     
     init() {
         FirebaseApp.configure()
-        
-        if Auth.auth().currentUser == nil {
-            Auth.auth().signInAnonymously { _, _ in }
-        }
+        // no anonymous sign-in - users can use the app without auth
+        // and sign in when they want to contribute or sync
     }
     
     var body: some Scene {

@@ -35,12 +35,12 @@ struct LaunchScreenView: View {
                 VStack(spacing: 12) {
                     HStack(alignment: .firstTextBaseline, spacing: 0) {
                         Text("Twi")
-                            .font(.system(size: 52, weight: .bold))
+                            .font(.system(size: 64, weight: .bold))
                             .foregroundColor(.white)
                         
                         Text(" Kasa")
-                            .font(.system(size: 52, weight: .bold))
-                            .foregroundColor(.white)
+                            .font(.system(size: 64, weight: .bold))
+                            .foregroundColor(.red.opacity(0.85))
                             .offset(x: kasaOffset)
                             .opacity(kasaOpacity)
                     }
