@@ -16,6 +16,8 @@ struct ProfileView: View {
     @State private var showReportSheet = false
     @State private var showSignInSheet = false
     @State private var showSignOutAlert = false
+    @State private var showClearCacheAlert = false
+    @State private var cacheSize: String = "Calculating..."
     
     var body: some View {
         NavigationStack {
@@ -35,6 +37,30 @@ struct ProfileView: View {
                     }
                 } header: {
                     Text("Content")
+                }
+                
+                // storage
+                Section {
+                    HStack {
+                        Text("Image Cache")
+                        Spacer()
+                        Text(cacheSize)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Button(role: .destructive) {
+                        showClearCacheAlert = true
+                    } label: {
+                        HStack {
+                            Label("Clear Cache", systemImage: "trash")
+                            Spacer()
+                        }
+                        .foregroundColor(.red)
+                    }
+                } header: {
+                    Text("Storage")
+                } footer: {
+                    Text("Clearing the cache will free up space. Images will be re-downloaded as needed.")
                 }
                 
                 // feedback
@@ -133,8 +159,27 @@ struct ProfileView: View {
             } message: {
                 Text("Your favorites are saved to your account. Keep them on this device or clear them?")
             }
+            .alert("Clear Cache?", isPresented: $showClearCacheAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Clear", role: .destructive) {
+                    ImageCache.shared.clearCache()
+                    updateCacheSize()
+                }
+            } message: {
+                Text("This will delete all cached images (\(cacheSize)). They will be re-downloaded when needed.")
+            }
             .onAppear {
                 adminService.checkAdminStatus()
+                updateCacheSize()
+            }
+        }
+    }
+    
+    private func updateCacheSize() {
+        Task {
+            let size = ImageCache.shared.getCacheSizeFormatted()
+            await MainActor.run {
+                cacheSize = size
             }
         }
     }

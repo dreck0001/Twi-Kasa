@@ -138,17 +138,12 @@ class SearchHistoryManager: ObservableObject {
     private func saveToCloud(userId: String, wordIds: [String]) async throws {
         let historyRef = db.collection("users").document(userId).collection("searchHistory")
         
-        // Delete all existing entries first (simpler than selective update)
-        let snapshot = try await historyRef.getDocuments()
-        for doc in snapshot.documents {
-            try await doc.reference.delete()
-        }
-        
-        // Add new entries with timestamps
+        // Use batch write for efficiency (max 500 operations)
         let batch = db.batch()
+        
         for (index, wordId) in wordIds.enumerated() {
             let docRef = historyRef.document(wordId)
-            // Use decreasing timestamps so order is preserved
+            // Use decreasing timestamps so newest is first
             let timestamp = Date().addingTimeInterval(-Double(index))
             batch.setData([
                 "wordId": wordId,
@@ -157,6 +152,37 @@ class SearchHistoryManager: ObservableObject {
         }
         
         try await batch.commit()
+    }
+    
+    /// Add a single word to cloud history (efficient individual update)
+    private func addToCloudHistory(userId: String, wordId: String) async throws {
+        let docRef = db.collection("users")
+            .document(userId)
+            .collection("searchHistory")
+            .document(wordId)
+        
+        try await docRef.setData([
+            "wordId": wordId,
+            "searchedAt": FieldValue.serverTimestamp()
+        ])
+    }
+    
+    /// Remove old entries beyond maxHistoryCount
+    private func cleanupOldCloudHistory(userId: String) async throws {
+        let snapshot = try await db.collection("users")
+            .document(userId)
+            .collection("searchHistory")
+            .order(by: "searchedAt", descending: true)
+            .getDocuments()
+        
+        // Delete entries beyond the limit
+        if snapshot.documents.count > maxHistoryCount {
+            let batch = db.batch()
+            for doc in snapshot.documents.dropFirst(maxHistoryCount) {
+                batch.deleteDocument(doc.reference)
+            }
+            try await batch.commit()
+        }
     }
     
     // MARK: - Helper Methods
@@ -259,12 +285,22 @@ class SearchHistoryManager: ObservableObject {
             return
         }
         
+        // Get the most recent word (just added)
+        guard let latestWord = recentSearches.first else {
+            return
+        }
+        
         Task {
             do {
-                let wordIds = recentSearches.map { $0.id }
-                try await saveToCloud(userId: user.uid, wordIds: wordIds)
+                // Add just the new word to cloud (efficient)
+                try await addToCloudHistory(userId: user.uid, wordId: latestWord.id)
+                
+                // Periodically clean up old entries (every 10 searches)
+                if recentSearches.count >= 10 && recentSearches.count % 10 == 0 {
+                    try await cleanupOldCloudHistory(userId: user.uid)
+                }
             } catch {
-                print("Failed to sync search history: \(error.localizedDescription)")
+                // Silent failure - local history still works
             }
         }
     }

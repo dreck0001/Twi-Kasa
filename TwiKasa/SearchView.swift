@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SearchView: View {
     @StateObject private var firestoreService = FirestoreService()
+    @ObservedObject private var searchHistoryManager = SearchHistoryManager.shared
     @EnvironmentObject private var deepLinkManager: DeepLinkManager
     @State private var searchText = ""
     @State private var searchResults: [Word] = []
@@ -16,13 +17,13 @@ struct SearchView: View {
     @State private var selectedWord: Word?
     @State private var searchTask: Task<Void, Never>?
     @State private var trendingWords: [Word] = []
-    @State private var recentSearches: [Word] = []
     @State private var newWords: [Word] = []
     @State private var isLoadingTrending = false
     @State private var isLoadingNewWords = false
     @State private var lastTrendingRefresh: Date?
     @State private var navigationPath = NavigationPath()
     @State private var showReportSheet = false
+    @State private var showClearHistoryAlert = false
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -44,7 +45,8 @@ struct SearchView: View {
             .navigationDestination(for: Word.self) { word in
                 WordDetailView(word: word)
                     .onAppear {
-                        saveRecentSearch(word)
+                        // Add to search history when viewing a word
+                        searchHistoryManager.addSearch(word)
                     }
             }
             .task {
@@ -60,8 +62,6 @@ struct SearchView: View {
                 if newWords.isEmpty {
                     loadNewWords()
                 }
-                
-                loadRecentSearches()
             }
             .onChange(of: deepLinkManager.pendingWordId) { _, wordId in
                 guard let wordId = wordId else { return }
@@ -74,6 +74,17 @@ struct SearchView: View {
             }
         }
         .tint(.red.opacity(0.8))
+        .alert("Clear Search History?", isPresented: $showClearHistoryAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear", role: .destructive) {
+                searchHistoryManager.clearHistory()
+            }
+        } message: {
+            Text("This will remove all \(searchHistoryManager.recentSearches.count) recent searches from your history.")
+        }
+        .refreshable {
+            await searchHistoryManager.refreshFromCloud()
+        }
     }
     
     private var searchBar: some View {
@@ -142,19 +153,39 @@ struct SearchView: View {
     private var emptyStateView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
-                if !recentSearches.isEmpty {
+                // Recent searches section
+                if !searchHistoryManager.recentSearches.isEmpty {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Recent")
-                            .font(.title)
-                            .fontWeight(.bold)
+                        HStack {
+                            Text("Recent")
+                                .font(.title)
+                                .fontWeight(.bold)
+                            
+                            Spacer()
+                            
+                            Button {
+                                showClearHistoryAlert = true
+                            } label: {
+                                Text("Clear")
+                                    .font(.subheadline)
+                                    .foregroundColor(.red.opacity(0.8))
+                            }
+                        }
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
-                                ForEach(recentSearches) { word in
+                                ForEach(searchHistoryManager.recentSearches) { word in
                                     NavigationLink(value: word) {
                                         WordCard(word: word)
                                     }
                                     .buttonStyle(.plain)
+                                    .contextMenu {
+                                        Button(role: .destructive) {
+                                            searchHistoryManager.removeSearch(word)
+                                        } label: {
+                                            Label("Remove from History", systemImage: "trash")
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -325,26 +356,6 @@ struct SearchView: View {
                 }
             }
         }
-    }
-    
-    private func loadRecentSearches() {
-        if let data = UserDefaults.standard.data(forKey: "recentSearches"),
-           let decoded = try? JSONDecoder().decode([Word].self, from: data) {
-            recentSearches = Array(decoded.prefix(5))
-        }
-    }
-    
-    private func saveRecentSearch(_ word: Word) {
-        var recents = recentSearches
-        recents.removeAll { $0.id == word.id }
-        recents.insert(word, at: 0)
-        recents = Array(recents.prefix(5))
-        
-        if let encoded = try? JSONEncoder().encode(recents) {
-            UserDefaults.standard.set(encoded, forKey: "recentSearches")
-        }
-        
-        recentSearches = recents
     }
 }
 

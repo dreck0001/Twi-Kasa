@@ -1,4 +1,5 @@
 import SwiftUI
+import CryptoKit
 
 class ImageCache {
     static let shared = ImageCache()
@@ -73,12 +74,59 @@ class ImageCache {
     func clearCache() {
         cache.removeAllObjects()
         try? fileManager.removeItem(at: cacheDirectory)
+        
+        // Recreate the directory after clearing
+        if !fileManager.fileExists(atPath: cacheDirectory.path) {
+            try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        }
+    }
+    
+    /// Returns the size of the disk cache in bytes
+    func getCacheSize() -> Int64 {
+        guard let enumerator = fileManager.enumerator(at: cacheDirectory, includingPropertiesForKeys: [.fileSizeKey]) else {
+            return 0
+        }
+        
+        var totalSize: Int64 = 0
+        for case let fileURL as URL in enumerator {
+            guard let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
+                  let fileSize = resourceValues.fileSize else {
+                continue
+            }
+            totalSize += Int64(fileSize)
+        }
+        return totalSize
+    }
+    
+    /// Returns a human-readable string of the cache size (e.g., "2.5 MB")
+    func getCacheSizeFormatted() -> String {
+        let bytes = Double(getCacheSize())
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(bytes))
+    }
+    
+    /// Removes a specific cached image
+    func remove(url: String) {
+        let key = NSString(string: url)
+        cache.removeObject(forKey: key)
+        
+        let fileURL = cacheDirectory.appendingPathComponent(url.md5)
+        try? fileManager.removeItem(at: fileURL)
     }
 }
 
 extension String {
+    /// Generates a proper MD5 hash of the string for use as a cache key.
+    /// Uses CryptoKit's Insecure.MD5 which is appropriate for non-security purposes like file naming.
     var md5: String {
-        let hash = self.hash
-        return String(format: "%016x", hash)
+        guard let data = self.data(using: .utf8) else {
+            // Fallback to simple hash if string can't be converted to UTF8
+            return String(format: "%016x", self.hash)
+        }
+        
+        let digest = Insecure.MD5.hash(data: data)
+        return digest.map { String(format: "%02hhx", $0) }.joined()
     }
 }

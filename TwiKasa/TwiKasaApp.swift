@@ -7,6 +7,7 @@ struct TwiKasaApp: App {
     @StateObject private var deepLinkManager = DeepLinkManager.shared
     @State private var showSplash = true
     @State private var splashOffset: CGFloat = 0
+    @State private var screenHeight: CGFloat = 0
     
     init() {
         FirebaseApp.configure()
@@ -16,26 +17,34 @@ struct TwiKasaApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ZStack {
-                ContentView()
-                    .environmentObject(deepLinkManager)
-                    .onOpenURL { url in
-                        _ = deepLinkManager.handleURL(url)
-                    }
-                
-                if showSplash {
-                    LaunchScreenView()
-                        .offset(y: splashOffset)
-                        .animation(.easeIn(duration: 0.4), value: splashOffset)
-                        .zIndex(1)
-                }
-            }
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    splashOffset = -UIScreen.main.bounds.height
+            GeometryReader { geometry in
+                ZStack {
+                    ContentView()
+                        .environmentObject(deepLinkManager)
+                        .onOpenURL { url in
+                            _ = deepLinkManager.handleURL(url)
+                        }
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        showSplash = false
+                    if showSplash {
+                        LaunchScreenView()
+                            .offset(y: splashOffset)
+                            .animation(.easeIn(duration: 0.4), value: splashOffset)
+                            .zIndex(1)
+                    }
+                }
+                .onAppear {
+                    screenHeight = geometry.size.height
+                    
+                    Task {
+                        try? await Task.sleep(for: .seconds(2.0))
+                        await MainActor.run {
+                            splashOffset = -screenHeight
+                        }
+                        
+                        try? await Task.sleep(for: .seconds(0.5))
+                        await MainActor.run {
+                            showSplash = false
+                        }
                     }
                 }
             }
