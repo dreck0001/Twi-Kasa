@@ -1,7 +1,9 @@
 import Foundation
+import FirebaseCore
 import FirebaseAuth
 import AuthenticationServices
 import CryptoKit
+import GoogleSignIn
 
 class AuthService: NSObject, ObservableObject, ASAuthorizationControllerDelegate {
     static let shared = AuthService()
@@ -161,6 +163,64 @@ class AuthService: NSObject, ObservableObject, ASAuthorizationControllerDelegate
             DispatchQueue.main.async {
                 self?.user = Auth.auth().currentUser
             }
+        }
+    }
+    
+    // MARK: - Google Sign In
+    
+    func startGoogleSignIn() {
+        guard !isLoading else { return }
+        
+        isLoading = true
+        
+        guard let clientID = FirebaseApp.app()?.options.clientID else {
+            DispatchQueue.main.async {
+                self.errorMessage = "Firebase configuration error"
+                self.isLoading = false
+            }
+            return
+        }
+        
+        let config = GIDConfiguration(clientID: clientID)
+        GIDSignIn.sharedInstance.configuration = config
+        
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            DispatchQueue.main.async {
+                self.errorMessage = "Unable to get root view controller"
+                self.isLoading = false
+            }
+            return
+        }
+        
+        GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                DispatchQueue.main.async {
+                    // Don't show error if user cancelled
+                    let nsError = error as NSError
+                    if nsError.code != -5 { // GIDSignInErrorCode.canceled
+                        self.errorMessage = "Google Sign In failed. Please try again."
+                    }
+                    self.isLoading = false
+                }
+                return
+            }
+            
+            guard let user = result?.user,
+                  let idToken = user.idToken?.tokenString else {
+                DispatchQueue.main.async {
+                    self.errorMessage = "Unable to get Google credentials"
+                    self.isLoading = false
+                }
+                return
+            }
+            
+            let credential = GoogleAuthProvider.credential(withIDToken: idToken,
+                                                          accessToken: user.accessToken.tokenString)
+            
+            self.performSignIn(with: credential, displayName: user.profile?.name)
         }
     }
     

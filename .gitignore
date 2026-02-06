@@ -4,6 +4,7 @@
 xcuserdata/
 *.xcscmblueprint
 *.xccheckout
+Info.plist
 
 # Swift Package Manager
 .build/

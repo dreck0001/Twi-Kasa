@@ -3,6 +3,7 @@ import Combine
 import FirebaseAuth
 import FirebaseFirestore
 
+@MainActor
 class SearchHistoryManager: ObservableObject {
     static let shared = SearchHistoryManager()
     
@@ -61,9 +62,7 @@ class SearchHistoryManager: ObservableObject {
                 }
             }
             
-            await MainActor.run {
-                self.recentSearches = words
-            }
+            self.recentSearches = words
         }
     }
     
@@ -75,9 +74,7 @@ class SearchHistoryManager: ObservableObject {
     // MARK: - Cloud Sync
     
     private func syncWithCloud(userId: String) async {
-        await MainActor.run {
-            isSyncing = true
-        }
+        isSyncing = true
         
         do {
             // Fetch cloud history
@@ -103,22 +100,16 @@ class SearchHistoryManager: ObservableObject {
                 }
             }
             
-            await MainActor.run {
-                self.recentSearches = words
-                self.saveLocalHistory()
-            }
+            self.recentSearches = words
+            self.saveLocalHistory()
             
             // Update cloud with merged history
             try await saveToCloud(userId: userId, wordIds: mergedIds)
             
-            await MainActor.run {
-                isSyncing = false
-            }
+            isSyncing = false
         } catch {
             print("Search history sync error: \(error.localizedDescription)")
-            await MainActor.run {
-                isSyncing = false
-            }
+            isSyncing = false
         }
     }
     
@@ -224,7 +215,24 @@ class SearchHistoryManager: ObservableObject {
     func removeSearch(_ word: Word) {
         recentSearches.removeAll { $0.id == word.id }
         saveLocalHistory()
-        syncToCloudIfNeeded()
+        
+        // Sync to cloud in background (if signed in)
+        guard let user = Auth.auth().currentUser, !user.isAnonymous else {
+            return
+        }
+        
+        Task {
+            do {
+                // Delete from cloud
+                try await self.db.collection("users")
+                    .document(user.uid)
+                    .collection("searchHistory")
+                    .document(word.id)
+                    .delete()
+            } catch {
+                // Silent failure - local removal still works
+            }
+        }
     }
     
     /// Clear all search history
@@ -290,14 +298,17 @@ class SearchHistoryManager: ObservableObject {
             return
         }
         
+        let wordId = latestWord.id
+        let currentCount = recentSearches.count
+        
         Task {
             do {
                 // Add just the new word to cloud (efficient)
-                try await addToCloudHistory(userId: user.uid, wordId: latestWord.id)
+                try await self.addToCloudHistory(userId: user.uid, wordId: wordId)
                 
                 // Periodically clean up old entries (every 10 searches)
-                if recentSearches.count >= 10 && recentSearches.count % 10 == 0 {
-                    try await cleanupOldCloudHistory(userId: user.uid)
+                if currentCount >= 10 && currentCount % 10 == 0 {
+                    try await self.cleanupOldCloudHistory(userId: user.uid)
                 }
             } catch {
                 // Silent failure - local history still works

@@ -85,8 +85,7 @@ struct SignInView: View {
                 HStack(spacing: 16) {
                     // Google button
                     Button {
-                        authService.errorMessage = "Google Sign In coming soon"
-                        showError = true
+                        authService.startGoogleSignIn()
                     } label: {
                         HStack(spacing: 8) {
                             Image("google")

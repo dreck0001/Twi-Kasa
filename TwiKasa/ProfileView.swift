@@ -147,17 +147,18 @@ struct ProfileView: View {
             }
             .alert("Sign Out?", isPresented: $showSignOutAlert) {
                 Button("Cancel", role: .cancel) {}
-                Button("Keep Favorites") {
-                    // sign out but keep local favorites
+                Button("Keep Data") {
+                    // sign out but keep local data
                     authService.signOut()
                 }
-                Button("Clear Favorites", role: .destructive) {
-                    // sign out and clear local favorites
+                Button("Clear All Data", role: .destructive) {
+                    // sign out and clear local data
                     FavoritesManager.shared.clearLocalOnSignOut()
+                    SearchHistoryManager.shared.clearLocalOnSignOut()
                     authService.signOut()
                 }
             } message: {
-                Text("Your favorites are saved to your account. Keep them on this device or clear them?")
+                Text("Your data is saved to your account. Keep it on this device or clear everything?")
             }
             .alert("Clear Cache?", isPresented: $showClearCacheAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -255,6 +256,7 @@ struct ProfileView: View {
     private var profileImage: some View {
         Group {
             if let url = authService.photoURL {
+                // Google Sign In provides photo URL
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
@@ -262,25 +264,58 @@ struct ProfileView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     default:
-                        placeholderImage
+                        initialsAvatar
                     }
                 }
             } else {
-                placeholderImage
+                // Apple Sign In - show initials
+                initialsAvatar
             }
         }
         .frame(width: 56, height: 56)
         .clipShape(Circle())
     }
     
-    private var placeholderImage: some View {
-        Circle()
-            .fill(Color.gray.opacity(0.2))
-            .overlay(
-                Image(systemName: "person.fill")
-                    .font(.title2)
-                    .foregroundColor(.gray)
-            )
+    private var initialsAvatar: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.red.opacity(0.8), Color.orange.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            
+            Text(userInitials)
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+        }
+    }
+    
+    private var userInitials: String {
+        let name = displayNameOrFallback
+        let components = name.components(separatedBy: " ")
+        
+        if components.count >= 2 {
+            // First and last name (e.g., "Denis Ansah")
+            let first = String(components[0].prefix(1))
+            let last = String(components[1].prefix(1))
+            return "\(first)\(last)".uppercased()
+        } else {
+            // Single name - check if it contains a period (from email like "denis.ansah")
+            let dotComponents = name.components(separatedBy: ".")
+            if dotComponents.count >= 2 {
+                // Email username format (e.g., "Denis.Ansah" -> "DA")
+                let first = String(dotComponents[0].prefix(1))
+                let last = String(dotComponents[1].prefix(1))
+                return "\(first)\(last)".uppercased()
+            } else {
+                // True single name - take first 2 characters
+                return String(name.prefix(2)).uppercased()
+            }
+        }
     }
 }
 
